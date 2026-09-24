@@ -1,0 +1,40 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest",
+    "dev": "nodemon index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mercadopago": "^2.0.15",
+    "multer": "^2.0.2",
+    "mysql2": "^3.15.3",
+    "nodemailer": "^6.9.16",
+    "sequelize": "^6.37.7",
+    "uuid": "^14.0.0",
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "@types/uuid": "^10.0.0",
+    "jest": "^30.4.2",
+    "nodemon": "^3.1.11"
+  },
+  "nodemonConfig": {
+    "ignore": [
+      "uploads/*",
+      "node_modules/*",
+      "*.log"
+    ],
+    "delay": "500"
+  }
+}
