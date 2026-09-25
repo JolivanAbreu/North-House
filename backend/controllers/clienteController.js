@@ -2,11 +2,6 @@ const Pedido = require('../models/Pedido');
 const PedidoItem = require('../models/PedidoItem');
 const Produto = require('../models/Produto');
 
-// CRM básico: em vez de cadastro duplicado de clientes, agrupamos os pedidos
-// já feitos por telefone (chave mais confiável que nome, que pode se repetir).
-// Isso evita manter uma segunda fonte de verdade e funciona automaticamente
-// desde o primeiro pedido feito pela vitrine.
-
 // Rota: GET /api/clientes
 exports.listarClientes = async (req, res) => {
   try {
@@ -60,8 +55,18 @@ exports.historicoCliente = async (req, res) => {
     const usuarioId = req.userData.lojaId;
     const { telefone } = req.params;
 
+    let whereClause = { UsuarioId: usuarioId };
+
+    // Correção: Trata casos de clientes que fizeram pedido sem telefone
+    if (telefone.startsWith('sem-telefone-')) {
+      whereClause.nome_cliente = telefone.replace('sem-telefone-', '');
+      whereClause.telefone_cliente = null;
+    } else {
+      whereClause.telefone_cliente = telefone;
+    }
+
     const pedidos = await Pedido.findAll({
-      where: { UsuarioId: usuarioId, telefone_cliente: telefone },
+      where: whereClause,
       include: [
         {
           model: PedidoItem,
