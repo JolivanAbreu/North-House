@@ -414,15 +414,35 @@ const Comandas = () => {
             const tipoMeta = getTipoEntregaMeta(comanda.tipo_entrega);
             const ehLocal = comanda.tipo_entrega === "Local";
             return (
-              <button
+              <div
                 key={comanda.id}
-                type="button"
+                role="button"
+                tabIndex={0}
                 onClick={() => setComandaAbertaId(comanda.id)}
-                className={`text-left rounded-2xl border p-4 shadow-sm hover:shadow-card hover:-translate-y-0.5 transition-all duration-200 flex flex-col gap-3 min-w-0 ${tipoMeta.cardClass}`}
+                onKeyDown={(e) => e.key === "Enter" && setComandaAbertaId(comanda.id)}
+                className={`group cursor-pointer text-left rounded-2xl border p-4 shadow-sm hover:shadow-card hover:-translate-y-0.5 transition-all duration-200 flex flex-col gap-2.5 min-w-0 ${tipoMeta.cardClass}`}
               >
-                <h3 className="font-bold text-[15px] text-stone-900 truncate w-full leading-tight">
-                  {nomeDaComanda(comanda)}
-                </h3>
+                <div className="flex items-start justify-between gap-2 w-full">
+                  <h3 className="font-bold text-[15px] text-stone-900 truncate leading-tight">
+                    {nomeDaComanda(comanda)}
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); imprimirComanda(comanda, perfil); }}
+                    disabled={!(comanda.PedidoItems || []).length}
+                    className="p-1 -m-1 rounded-md text-stone-400 hover:text-stone-900 hover:bg-white/70 transition-colors shrink-0 disabled:opacity-30 disabled:pointer-events-none"
+                    title="Imprimir comanda"
+                    aria-label="Imprimir comanda"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <div className="flex items-baseline justify-between gap-2 w-full">
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-stone-400">Subtotal</span>
+                  <span className="text-base font-bold font-display text-stone-900 tabular-nums">
+                    {formatCurrency(comanda.subtotal)}
+                  </span>
+                </div>
                 <div className="flex items-center justify-between gap-2 w-full">
                   <span className="text-xs text-stone-500 font-semibold truncate">
                     {ehLocal ? (comanda.mesa_numero ? `Mesa ${comanda.mesa_numero}` : "Sem mesa") : tipoMeta.label}
@@ -433,7 +453,7 @@ const Comandas = () => {
                     <Badge color="rose">Aberto</Badge>
                   )}
                 </div>
-              </button>
+              </div>
             );
           })}
         </div>
@@ -656,13 +676,23 @@ const ComandaDetalhe = ({
           </div>
 
           {!comanda.pago ? (
-            <button
-              onClick={onPagar}
-              disabled={itens.length === 0}
-              className="w-full flex items-center justify-center gap-2 bg-emerald-600 text-white py-3.5 rounded-xl font-bold text-base hover:bg-emerald-700 transition-all shadow-md disabled:bg-stone-200 disabled:text-stone-400 disabled:shadow-none disabled:cursor-not-allowed"
-            >
-              <Wallet className="w-5 h-5" /> Pagar
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={onPagar}
+                disabled={itens.length === 0}
+                className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 text-white py-3.5 rounded-xl font-bold text-base hover:bg-emerald-700 transition-all shadow-md disabled:bg-stone-200 disabled:text-stone-400 disabled:shadow-none disabled:cursor-not-allowed"
+              >
+                <Wallet className="w-5 h-5" /> Pagar
+              </button>
+              <button
+                onClick={onImprimir}
+                disabled={itens.length === 0}
+                className="flex items-center justify-center gap-2 px-4 bg-white text-stone-700 border border-stone-200 rounded-xl font-bold text-sm hover:bg-stone-50 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Imprimir a conta para conferência do cliente"
+              >
+                <Printer className="w-4 h-4" /> Imprimir
+              </button>
+            </div>
           ) : (
             <div className="space-y-2">
               <p className="text-xs text-center text-stone-500">

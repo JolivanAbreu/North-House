@@ -37,7 +37,13 @@ export const imprimirComanda = (comanda, perfil = null, larguraMm = 80) => {
     .join("");
 
   const ehLocal = comanda.tipo_entrega === "Local";
-  const cliente = comanda.nome_cliente && comanda.nome_cliente !== "Comanda Local" ? comanda.nome_cliente : "";
+  const cliente = comanda.nome_cliente && !["Comanda Local", "Cliente"].includes(comanda.nome_cliente)
+    ? comanda.nome_cliente
+    : "Não informado";
+  const mesa = ehLocal ? (comanda.mesa_numero ? String(comanda.mesa_numero) : "Balcão") : comanda.tipo_entrega;
+  const pagamento = comanda.pago
+    ? comanda.forma_pagamento_ilustrativa || "-"
+    : "A PAGAR";
   const contato = [
     perfil?.telefone_whatsapp ? formatarTelefone(perfil.telefone_whatsapp) : "",
     perfil?.link_instagram ? "@" + String(perfil.link_instagram).replace(/\/+$/, "").split("/").pop() : "",
@@ -65,6 +71,9 @@ export const imprimirComanda = (comanda, perfil = null, larguraMm = 80) => {
           .muted { font-size: 11px; }
           p { margin: 2px 0; }
           .destaque { font-weight: bold; font-size: 13px; text-align: center; }
+          .info td { font-size: 12px; padding: 1px 0; }
+          .info td:first-child { width: 22mm; font-weight: bold; }
+          .apagar { font-weight: bold; }
         </style>
       </head>
       <body>
@@ -74,11 +83,16 @@ export const imprimirComanda = (comanda, perfil = null, larguraMm = 80) => {
         ${contato ? `<p class="sub">${esc(contato)}</p>` : ""}
         <div class="linha"></div>
         <p class="destaque">COMANDA #${comanda.id}</p>
-        <p class="centro muted">${ehLocal ? (comanda.mesa_numero ? `Mesa ${esc(comanda.mesa_numero)}` : "Balcão") : esc(comanda.tipo_entrega)}</p>
-        <p class="muted">Data: ${formatDateTime(comanda.updatedAt || comanda.createdAt)}</p>
-        ${cliente ? `<p class="muted">Cliente: ${esc(cliente)}</p>` : ""}
-        ${!ehLocal && comanda.telefone_cliente ? `<p class="muted">Tel: ${esc(formatarTelefone(comanda.telefone_cliente))}</p>` : ""}
-        ${comanda.endereco_entrega ? `<p class="muted">Entrega: ${esc(comanda.endereco_entrega)}</p>` : ""}
+        <p class="centro muted">${formatDateTime(comanda.updatedAt || comanda.createdAt)}</p>
+        <div class="linha"></div>
+        <table class="info">
+          <tr><td>Cliente:</td><td>${esc(cliente)}</td></tr>
+          <tr><td>${ehLocal ? "Mesa:" : "Tipo:"}</td><td>${esc(mesa)}</td></tr>
+          ${!ehLocal && comanda.telefone_cliente ? `<tr><td>Telefone:</td><td>${esc(formatarTelefone(comanda.telefone_cliente))}</td></tr>` : ""}
+          ${comanda.endereco_entrega ? `<tr><td>Entrega:</td><td>${esc(comanda.endereco_entrega)}</td></tr>` : ""}
+        </table>
+        <div class="linha"></div>
+        <p class="muted" style="font-weight:bold;">PRODUTOS</p>
         <div class="linha"></div>
         <table>${itensHtml}</table>
         <div class="linha"></div>
@@ -87,10 +101,12 @@ export const imprimirComanda = (comanda, perfil = null, larguraMm = 80) => {
           ${parseFloat(comanda.valor_desconto || 0) > 0 ? `<tr><td>Desconto</td><td class="dir">-${formatCurrency(comanda.valor_desconto)}</td></tr>` : ""}
           <tr class="total"><td>TOTAL</td><td class="dir">${formatCurrency(comanda.valor_total)}</td></tr>
         </table>
-        <p class="muted" style="margin-top:6px;">Pagamento: ${esc(comanda.forma_pagamento_ilustrativa || "-")}</p>
+        <table class="info" style="margin-top:6px;">
+          <tr><td>Pagamento:</td><td class="${comanda.pago ? "" : "apagar"}">${esc(pagamento)}</td></tr>
+        </table>
         <div class="linha"></div>
         <p class="centro muted">Obrigado pela preferência!</p>
-        <p class="centro muted">Volte sempre ao ${esc(BRAND.nome)}</p>
+        <p class="centro muted">Volte sempre à ${esc(BRAND.nome)}</p>
         <script>
           // Espera o logo carregar (ou falhar) antes de abrir a impressão
           window.addEventListener('load', function () { setTimeout(function () { window.print(); }, 150); });

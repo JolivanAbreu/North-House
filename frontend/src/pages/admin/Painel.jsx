@@ -15,13 +15,13 @@ const NAV_ITEMS = [
   { to: "/admin/delivery", label: "Delivery", icon: Bike },
   { to: "/admin/cardapio", label: "Cardápio", icon: UtensilsCrossed },
   { to: "/admin/mercearia", label: "Mercearia", icon: ShoppingBasket },
+  { to: "/admin/pedidos", label: "Pedidos", icon: ClipboardList },
   { to: "/admin/relatorios", label: "Relatórios", icon: FileBarChart },
 ];
 
 // Telas de apoio, agrupadas no menu "Mais"
 const NAV_ITEMS_MAIS = [
   { to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/admin/pedidos", label: "Histórico de pedidos", icon: ClipboardList },
   { to: "/admin/categorias", label: "Categorias", icon: Tags },
   { to: "/admin/clientes", label: "Clientes", icon: Users },
 ];

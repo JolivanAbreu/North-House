@@ -1,68 +1,34 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { FileDown, Printer, ClipboardList } from "lucide-react";
+import { FileDown, Printer } from "lucide-react";
 import api from "../../services/api.mjs";
 import PageHeader from "../../components/ui/PageHeader.jsx";
 import { Card, CardHeader, CardBody } from "../../components/ui/Card.jsx";
-import EmptyState from "../../components/ui/EmptyState.jsx";
-import Badge from "../../components/ui/Badge.jsx";
-import { formatCurrency, formatDateTime, getStatusMeta } from "../../utils/format.mjs";
+import TabelaPedidos from "../../components/TabelaPedidos.jsx";
+import { formatCurrency, formatDateTime } from "../../utils/format.mjs";
+import { PERIODOS, dentroDoPeriodo } from "../../utils/periodos.mjs";
 import { downloadCSV } from "../../utils/csv.mjs";
 import Logo from "../../components/Logo.jsx";
 import { BRAND } from "../../config/brand.mjs";
 
-const PERIODOS = [
-  { value: "hoje", label: "Diário" },
-  { value: "semana", label: "Semanal" },
-  { value: "mes", label: "Mensal" },
-  { value: "semestre", label: "Semestral" },
-  { value: "ano", label: "Anual" },
-  { value: "tudo", label: "Tudo" },
-];
-
-const TODOS_STATUS = ["Recebido", "Em preparo", "Pronto para entrega", "Pronto para retirada", "Concluído", "Cancelado"];
-
-const dentroDoPeriodo = (dataISO, periodo) => {
-  if (periodo === "tudo") return true;
-  const data = new Date(dataISO);
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
-
-  if (periodo === "hoje") {
-    return data >= hoje;
-  }
-  if (periodo === "semana") {
-    const inicioSemana = new Date(hoje);
-    inicioSemana.setDate(hoje.getDate() - hoje.getDay());
-    return data >= inicioSemana;
-  }
-  if (periodo === "mes") {
-    const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-    return data >= inicioMes;
-  }
-  if (periodo === "semestre") {
-    const mesInicio = hoje.getMonth() < 6 ? 0 : 6;
-    const inicioSemestre = new Date(hoje.getFullYear(), mesInicio, 1);
-    return data >= inicioSemestre;
-  }
-  if (periodo === "ano") {
-    const inicioAno = new Date(hoje.getFullYear(), 0, 1);
-    return data >= inicioAno;
-  }
-  return true;
-};
+const TODOS_STATUS = ["Recebido", "Em preparo", "Saiu para entrega", "Pronto para retirada", "Concluído", "Cancelado"];
 
 const Relatorios = () => {
   const [pedidos, setPedidos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [periodo, setPeriodo] = useState("mes");
   const [statusFiltro, setStatusFiltro] = useState("Todos");
+  const [perfil, setPerfil] = useState(null);
 
   useEffect(() => {
     const fetchDados = async () => {
       try {
         setLoading(true);
-        const resPedidos = await api.get("/pedidos/admin?incluirArquivados=true");
+        const [resPedidos, resPerfil] = await Promise.all([
+          api.get("/pedidos/admin?incluirArquivados=true"),
+          api.get("/perfil").catch(() => ({ data: null })),
+        ]);
         setPedidos(resPedidos.data);
+        setPerfil(resPerfil.data);
       } catch (error) {
         console.error("Erro ao buscar dados dos relatórios:", error);
       } finally {
@@ -78,6 +44,7 @@ const Relatorios = () => {
       .filter((p) => statusFiltro === "Todos" || p.status === statusFiltro)
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   }, [pedidos, periodo, statusFiltro]);
+
 
   const resumo = useMemo(() => {
     const validos = pedidosFiltrados.filter((p) => p.status !== "Cancelado");
@@ -227,44 +194,11 @@ const Relatorios = () => {
         </CardBody>
       </Card>
 
-      <Card>
-        <CardHeader title="Pedidos no período" subtitle={`${pedidosFiltrados.length} registros`} />
-        <CardBody>
-          {pedidosFiltrados.length === 0 ? (
-            <EmptyState icon={ClipboardList} title="Nenhum pedido neste filtro" />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-stone-100 text-stone-500 text-xs uppercase tracking-wide">
-                    <th className="text-left p-3">Pedido</th>
-                    <th className="text-left p-3">Data</th>
-                    <th className="text-left p-3">Cliente</th>
-                    <th className="text-left p-3">Status</th>
-                    <th className="text-left p-3">Pagamento</th>
-                    <th className="text-right p-3">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pedidosFiltrados.map((pedido) => {
-                    const meta = getStatusMeta(pedido.status);
-                    return (
-                      <tr key={pedido.id} className="border-b border-stone-50">
-                        <td className="p-3 font-medium text-stone-800">#{pedido.id}</td>
-                        <td className="p-3 text-stone-500">{formatDateTime(pedido.createdAt)}</td>
-                        <td className="p-3 text-stone-700">{pedido.nome_cliente}</td>
-                        <td className="p-3"><Badge color={meta.color}>{meta.label}</Badge></td>
-                        <td className="p-3 text-stone-500">{pedido.forma_pagamento_ilustrativa}</td>
-                        <td className="p-3 text-right font-semibold text-stone-800">{formatCurrency(pedido.valor_total)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardBody>
-      </Card>
+      <TabelaPedidos
+        pedidos={pedidosFiltrados}
+        perfil={perfil}
+        onExcluido={(id) => setPedidos((prev) => prev.filter((p) => p.id !== id))}
+      />
     </div>
   );
 };
