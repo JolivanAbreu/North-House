@@ -25,6 +25,9 @@ router.post('/pedidos/admin', pedidoAdminController.createComandaLocal);
 // Adicionar item a uma comanda aberta
 router.post('/pedidos/admin/:id/itens', pedidoAdminController.addItemComanda);
 
+// Alterar a quantidade de um item da comanda
+router.put('/pedidos/admin/:id/itens/:itemId', pedidoAdminController.updateItemComanda);
+
 // Remover item de uma comanda aberta
 router.delete('/pedidos/admin/:id/itens/:itemId', pedidoAdminController.removeItemComanda);
 

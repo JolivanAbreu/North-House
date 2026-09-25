@@ -1,7 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
+import { IMaskInput } from "react-imask";
+import toast from "react-hot-toast";
 import { createPortal } from "react-dom";
 import { X, Wallet, CreditCard, QrCode, CheckCircle2 } from "lucide-react";
 import { formatCurrency } from "../utils/format.mjs";
+import useTravarScroll from "../hooks/useTravarScroll.mjs";
 
 const FORMAS = [
   { value: "Dinheiro", label: "Dinheiro", icon: Wallet },
@@ -14,24 +17,16 @@ const PagamentoComandaModal = ({ show, onClose, comanda, onGerarPix, onFinalizar
   const [pix, setPix] = useState(null);
   const [gerandoPix, setGerandoPix] = useState(false);
   const [valorRecebido, setValorRecebido] = useState("");
-  const [isMounted, setIsMounted] = useState(false);
+  const [tipoCartao, setTipoCartao] = useState("Débito");
+  useTravarScroll(show);
 
-  useEffect(() => {
-    setIsMounted(true);
-    if (show) {
-      document.body.style.overflow = "hidden";
-    }
-    return () => {
-      document.body.style.overflow = "unset";
-    };
-  }, [show]);
-
-  if (!show || !comanda || !isMounted) return null;
+  if (!show || !comanda) return null;
 
   const resetar = () => {
     setForma(null);
     setPix(null);
     setValorRecebido("");
+    setTipoCartao("Débito");
   };
 
   const handleEscolherForma = async (valor) => {
@@ -43,6 +38,8 @@ const PagamentoComandaModal = ({ show, onClose, comanda, onGerarPix, onFinalizar
       try {
         const resultado = await onGerarPix(comanda.id);
         setPix(resultado);
+      } catch (error) {
+        toast.error(error.response?.data?.message || "Não foi possível gerar o Pix.");
       } finally {
         setGerandoPix(false);
       }
@@ -50,21 +47,14 @@ const PagamentoComandaModal = ({ show, onClose, comanda, onGerarPix, onFinalizar
   };
 
   const handleFinalizar = async () => {
-    // Caso a API espere receber os valores, você pode passar nos parâmetros.
-    // Aqui estou mantendo apenas forma, conforme a assinatura original de onFinalizar
-    await onFinalizar(comanda.id, forma);
+    const formaFinal = forma === "Cartão" ? `Cartão de ${tipoCartao.toLowerCase()}` : forma;
+    await onFinalizar(comanda.id, formaFinal);
     resetar();
   };
 
-  const calcularTroco = () => {
-    if (!valorRecebido) return 0;
-    const recebido = parseFloat(valorRecebido.replace(",", "."));
-    const total = parseFloat(comanda.valor_total);
-    if (isNaN(recebido) || recebido < total) return 0;
-    return recebido - total;
-  };
-
-  const troco = calcularTroco();
+  const total = parseFloat(comanda.valor_total) || 0;
+  const recebido = parseFloat(String(valorRecebido).replace(",", ".")) || 0;
+  const troco = recebido >= total ? recebido - total : 0;
 
   const modalContent = (
     <div
@@ -111,27 +101,66 @@ const PagamentoComandaModal = ({ show, onClose, comanda, onGerarPix, onFinalizar
 
         {forma === "Dinheiro" && (
           <div className="mb-5 animate-fadeIn">
-            <label className="block text-sm font-medium text-stone-700 mb-1.5">
-              Valor recebido (R$)
-            </label>
-            <input
-              type="number"
-              step="0.01"
-              min={comanda.valor_total}
-              placeholder="Ex: 50.00"
-              value={valorRecebido}
-              onChange={(e) => setValorRecebido(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-white focus:outline-none focus:ring-2 focus:ring-brand-400"
-              autoFocus
-            />
-            {valorRecebido && parseFloat(valorRecebido) >= comanda.valor_total && (
+            <label className="block text-sm font-medium text-stone-700 mb-1.5">Valor recebido</label>
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-stone-400">R$</span>
+              <IMaskInput
+                mask={Number}
+                scale={2}
+                radix=","
+                mapToRadix={["."]}
+                thousandsSeparator="."
+                min={0}
+                unmask
+                value={valorRecebido}
+                onAccept={(v) => setValorRecebido(v)}
+                placeholder="0,00"
+                className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-stone-200 bg-white focus:outline-none focus:ring-2 focus:ring-brand-400"
+                autoFocus
+              />
+            </div>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {[total, ...[10, 20, 50, 100, 200].filter((n) => n > total)].slice(0, 5).map((valor, i) => (
+                <button
+                  key={valor}
+                  type="button"
+                  onClick={() => setValorRecebido(String(valor))}
+                  className="px-3 py-1 rounded-lg text-xs font-semibold bg-stone-100 text-stone-700 hover:bg-stone-200"
+                >
+                  {i === 0 ? "Valor exato" : formatCurrency(valor)}
+                </button>
+              ))}
+            </div>
+            {valorRecebido && recebido >= total && (
               <div className="mt-3 p-3 bg-emerald-50 border border-emerald-100 rounded-xl flex justify-between items-center animate-slideUp">
                 <span className="text-sm font-medium text-emerald-800">Troco a devolver:</span>
-                <span className="text-lg font-bold text-emerald-700">
-                  {formatCurrency(troco)}
-                </span>
+                <span className="text-lg font-bold text-emerald-700">{formatCurrency(troco)}</span>
               </div>
             )}
+            {valorRecebido && recebido < total && (
+              <p className="mt-2 text-xs text-rose-600">Faltam {formatCurrency(total - recebido)}.</p>
+            )}
+          </div>
+        )}
+
+        {forma === "Cartão" && (
+          <div className="mb-5 animate-fadeIn">
+            <p className="text-sm font-medium text-stone-700 mb-2">Tipo do cartão</p>
+            <div className="grid grid-cols-2 gap-2">
+              {["Débito", "Crédito"].map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setTipoCartao(t)}
+                  className={`py-2 rounded-xl border text-sm font-semibold transition-colors ${
+                    tipoCartao === t ? "bg-stone-900 text-white border-stone-900" : "bg-white text-stone-600 border-stone-200 hover:bg-stone-50"
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-stone-400 mt-2">Passe o cartão na maquininha e finalize após a aprovação.</p>
           </div>
         )}
 
@@ -148,7 +177,7 @@ const PagamentoComandaModal = ({ show, onClose, comanda, onGerarPix, onFinalizar
                 {pix.copiaECola && (
                   <button
                     type="button"
-                    onClick={() => navigator.clipboard?.writeText(pix.copiaECola)}
+                    onClick={() => { navigator.clipboard?.writeText(pix.copiaECola); toast.success("Código Pix copiado!"); }}
                     className="text-xs text-brand-600 font-semibold underline mt-1"
                   >
                     Copiar código Pix
@@ -170,7 +199,7 @@ const PagamentoComandaModal = ({ show, onClose, comanda, onGerarPix, onFinalizar
           <button
             type="button"
             onClick={handleFinalizar}
-            disabled={!forma || finalizando || (forma === "Pix" && gerandoPix) || (forma === "Dinheiro" && (!valorRecebido || parseFloat(valorRecebido) < comanda.valor_total))}
+            disabled={!forma || finalizando || (forma === "Pix" && gerandoPix) || (forma === "Dinheiro" && (!valorRecebido || recebido < total))}
             className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-5 py-2.5 bg-emerald-600 text-white rounded-xl font-semibold text-sm hover:bg-emerald-700 transition-colors disabled:bg-stone-300 shadow-soft"
           >
             <CheckCircle2 className="w-4 h-4" /> {finalizando ? "Finalizando..." : "Finalizar comanda"}

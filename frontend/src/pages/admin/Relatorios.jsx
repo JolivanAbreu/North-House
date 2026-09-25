@@ -7,6 +7,8 @@ import EmptyState from "../../components/ui/EmptyState.jsx";
 import Badge from "../../components/ui/Badge.jsx";
 import { formatCurrency, formatDateTime, getStatusMeta } from "../../utils/format.mjs";
 import { downloadCSV } from "../../utils/csv.mjs";
+import Logo from "../../components/Logo.jsx";
+import { BRAND } from "../../config/brand.mjs";
 
 const PERIODOS = [
   { value: "hoje", label: "Diário" },
@@ -51,7 +53,6 @@ const dentroDoPeriodo = (dataISO, periodo) => {
 
 const Relatorios = () => {
   const [pedidos, setPedidos] = useState([]);
-  const [nomeLoja, setNomeLoja] = useState("");
   const [loading, setLoading] = useState(true);
   const [periodo, setPeriodo] = useState("mes");
   const [statusFiltro, setStatusFiltro] = useState("Todos");
@@ -60,12 +61,8 @@ const Relatorios = () => {
     const fetchDados = async () => {
       try {
         setLoading(true);
-        const [resPedidos, resPerfil] = await Promise.all([
-          api.get("/pedidos/admin?incluirArquivados=true"),
-          api.get("/perfil"),
-        ]);
+        const resPedidos = await api.get("/pedidos/admin?incluirArquivados=true");
         setPedidos(resPedidos.data);
-        setNomeLoja(resPerfil.data?.nome_loja || "");
       } catch (error) {
         console.error("Erro ao buscar dados dos relatórios:", error);
       } finally {
@@ -135,9 +132,12 @@ const Relatorios = () => {
   return (
     <div className="animate-fadeIn">
       {/* Cabeçalho com a marca da loja - só aparece na impressão/PDF */}
-      <div className="hidden print:block mb-6 text-center">
-        <h1 className="text-2xl font-bold font-display">{nomeLoja || "Relatório de Vendas"}</h1>
-        <p className="text-sm text-stone-500">Relatório de vendas — período: {PERIODOS.find((p) => p.value === periodo)?.label}</p>
+      <div className="hidden print:flex flex-col items-center mb-6 text-center border-b-2 border-brand-600 pb-4">
+        <Logo size="lg" className="mb-2" />
+        <h1 className="text-2xl font-bold font-display text-stone-900">{BRAND.nome}</h1>
+        <p className="text-sm text-stone-500">
+          Relatório de vendas — período: {PERIODOS.find((p) => p.value === periodo)?.label} · emitido em {formatDateTime(new Date().toISOString())}
+        </p>
       </div>
 
       <PageHeader
@@ -205,7 +205,7 @@ const Relatorios = () => {
           <p className="text-2xl font-bold font-display mt-1">{formatCurrency(resumo.ticketMedio)}</p>
         </Card>
         <Card className="p-5">
-          <h3 className="text-xs font-semibold text-stone-500 uppercase">Descontos (cupons)</h3>
+          <h3 className="text-xs font-semibold text-stone-500 uppercase">Descontos</h3>
           <p className="text-2xl font-bold font-display mt-1 text-emerald-600">{formatCurrency(resumo.totalDescontos)}</p>
         </Card>
       </div>

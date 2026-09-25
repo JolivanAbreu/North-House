@@ -197,17 +197,32 @@
     return pedido;
   };
 
+  const TIPOS_COMANDA = ['Local', 'Delivery', 'Retirada'];
+
   // Rota: POST /api/pedidos/admin
-  // Abre uma comanda local (atendimento presencial), direto pelo staff -
-  // sem passar pela vitrine pública. Cliente e mesa são opcionais.
+  // Abre uma comanda direto pelo staff (o Casa Nova não tem vitrine pública).
+  // - Local: cliente e mesa opcionais, sem telefone.
+  // - Delivery / Retirada: pedidos recebidos por telefone/WhatsApp, com
+  //   telefone do cliente (e endereço, no delivery).
   exports.createComandaLocal = async (req, res) => {
     const t = await sequelize.transaction();
     try {
       const usuarioId = req.userData.lojaId;
-      const { nome_cliente, telefone_cliente, mesaId } = req.body;
+      const { nome_cliente, telefone_cliente, mesaId, endereco_entrega } = req.body;
+      const tipo_entrega = TIPOS_COMANDA.includes(req.body.tipo_entrega) ? req.body.tipo_entrega : 'Local';
+      const ehLocal = tipo_entrega === 'Local';
+
+      if (!ehLocal && !String(telefone_cliente || '').replace(/\D/g, '')) {
+        await t.rollback();
+        return res.status(400).json({ message: 'Informe o telefone do cliente.' });
+      }
+      if (tipo_entrega === 'Delivery' && !String(endereco_entrega || '').trim()) {
+        await t.rollback();
+        return res.status(400).json({ message: 'Informe o endereço de entrega.' });
+      }
 
       let mesa = null;
-      if (mesaId) {
+      if (mesaId && ehLocal) {
         mesa = await Mesa.findOne({ where: { id: mesaId, UsuarioId: usuarioId }, transaction: t });
         if (!mesa) {
           await t.rollback();
@@ -220,9 +235,10 @@
       }
 
       const novaComanda = await Pedido.create({
-        nome_cliente: nome_cliente?.trim() || 'Comanda Local',
-        telefone_cliente: telefone_cliente || null,
-        tipo_entrega: 'Local',
+        nome_cliente: nome_cliente?.trim() || (ehLocal ? 'Comanda Local' : 'Cliente'),
+        telefone_cliente: ehLocal ? null : String(telefone_cliente).replace(/\D/g, ''),
+        endereco_entrega: tipo_entrega === 'Delivery' ? String(endereco_entrega).trim() : null,
+        tipo_entrega,
         forma_pagamento_ilustrativa: null,
         status: 'Em preparo',
         pago: false,
@@ -325,6 +341,54 @@
     }
   };
 
+  // Rota: PUT /api/pedidos/admin/:id/itens/:itemId
+  // Altera a quantidade de um item já lançado (botões + / - da comanda).
+  exports.updateItemComanda = async (req, res) => {
+    const t = await sequelize.transaction();
+    try {
+      const { id, itemId } = req.params;
+      const quantidade = parseFloat(req.body.quantidade);
+      const usuarioId = req.userData.lojaId;
+
+      if (!quantidade || quantidade <= 0) {
+        await t.rollback();
+        return res.status(400).json({ message: 'Informe uma quantidade válida.' });
+      }
+
+      const pedido = await Pedido.findOne({ where: { id, UsuarioId: usuarioId }, transaction: t });
+      if (!pedido) {
+        await t.rollback();
+        return res.status(404).json({ message: 'Comanda não encontrada.' });
+      }
+      if (pedido.pago) {
+        await t.rollback();
+        return res.status(400).json({ message: 'Essa comanda já foi paga e finalizada. Reabra a comanda para editar os itens.' });
+      }
+
+      const item = await PedidoItem.findOne({ where: { id: itemId, PedidoId: pedido.id }, transaction: t });
+      if (!item) {
+        await t.rollback();
+        return res.status(404).json({ message: 'Item não encontrado nessa comanda.' });
+      }
+
+      await item.update({ quantidade }, { transaction: t });
+      await recalcularTotais(pedido.id, t);
+      await t.commit();
+
+      const comandaAtualizada = await Pedido.findByPk(pedido.id, {
+        include: [
+          { model: PedidoItem, include: [{ model: Produto, attributes: ['id', 'nome'], include: [{ model: Categoria, attributes: ['id', 'nome', 'tipo'] }] }] },
+          { model: Mesa, attributes: ['id', 'numero', 'status'] },
+        ],
+      });
+      res.status(200).json(comandaAtualizada);
+    } catch (error) {
+      await t.rollback();
+      console.error('ERRO EM updateItemComanda:', error);
+      res.status(500).json({ message: 'Erro ao alterar item da comanda', error: error.message });
+    }
+  };
+
   // Rota: DELETE /api/pedidos/admin/:id/itens/:itemId
   exports.removeItemComanda = async (req, res) => {
     const t = await sequelize.transaction();
@@ -421,7 +485,7 @@
 
       const comandaFinalizada = await Pedido.findByPk(pedido.id, {
         include: [
-          { model: PedidoItem, include: [{ model: Produto, attributes: ['id', 'nome'] }] },
+          { model: PedidoItem, include: [{ model: Produto, attributes: ['id', 'nome'], include: [{ model: Categoria, attributes: ['id', 'nome', 'tipo'] }] }] },
           { model: Mesa, attributes: ['id', 'numero', 'status'] },
         ],
       });

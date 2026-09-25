@@ -38,10 +38,17 @@ const GerenciarCategorias = () => {
     fetchCategorias();
   }, []);
 
-  const resetForm = () => {
+  const resetForm = (tipoPadrao = abaFiltro) => {
     setNome("");
-    setTipo("cardapio");
+    setTipo(tipoPadrao);
     setEditando(null);
+  };
+
+  // O tipo da nova categoria acompanha a aba aberta (Cardápio / Mercearia),
+  // para não criar sem querer uma categoria de mercearia como cardápio.
+  const trocarAba = (novaAba) => {
+    setAbaFiltro(novaAba);
+    if (!editando) setTipo(novaAba);
   };
 
   const handleSubmit = async (e) => {
@@ -56,7 +63,8 @@ const GerenciarCategorias = () => {
         await api.post("/categorias", data);
         toast.success("Categoria criada!");
       }
-      resetForm();
+      setAbaFiltro(tipo);
+      resetForm(tipo);
       fetchCategorias();
     } catch {
       toast.error("Erro ao salvar categoria.");
@@ -116,7 +124,7 @@ const GerenciarCategorias = () => {
               {editando ? "Atualizar" : "Salvar"}
             </button>
             {editando && (
-              <button type="button" onClick={resetForm} className="flex items-center gap-1.5 bg-stone-100 text-stone-600 px-4 py-2.5 rounded-xl font-semibold hover:bg-stone-200 transition-colors">
+              <button type="button" onClick={() => resetForm()} className="flex items-center gap-1.5 bg-stone-100 text-stone-600 px-4 py-2.5 rounded-xl font-semibold hover:bg-stone-200 transition-colors">
                 <X className="w-4 h-4" /> Cancelar
               </button>
             )}
@@ -132,7 +140,7 @@ const GerenciarCategorias = () => {
               {TIPOS.map((t) => (
                 <button
                   key={t.value}
-                  onClick={() => setAbaFiltro(t.value)}
+                  onClick={() => trocarAba(t.value)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                     abaFiltro === t.value ? "bg-stone-900 text-white" : "bg-white text-stone-600 border border-stone-200"
                   }`}

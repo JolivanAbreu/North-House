@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { Store, User, Mail, Lock } from 'lucide-react';
+import { User, Mail, Lock } from 'lucide-react';
 import useAuth from '../hooks/useAuth';
 import { Link } from 'react-router-dom';
 import { inputClasses, Field } from '../components/ui/Input.jsx';
+import Logo from '../components/Logo.jsx';
+import { BRAND } from '../config/brand.mjs';
 
 const Registro = () => {
   const [nome, setNome] = useState('');
@@ -22,11 +24,9 @@ const Registro = () => {
     <div className="flex items-center justify-center min-h-screen bg-stone-50 px-4">
       <div className="w-full max-w-sm animate-slideUp">
         <div className="flex flex-col items-center mb-8">
-          <span className="w-12 h-12 rounded-2xl bg-brand-600 flex items-center justify-center shadow-soft mb-3">
-            <Store className="w-6 h-6 text-white" />
-          </span>
-          <h2 className="text-2xl font-bold font-display text-stone-900">Crie sua loja</h2>
-          <p className="text-stone-500 text-sm mt-1">Comece a vender em minutos</p>
+          <Logo size="lg" className="mb-3" />
+          <h2 className="text-2xl font-bold font-display text-stone-900">{BRAND.nome}</h2>
+          <p className="text-stone-500 text-sm mt-1">Crie o acesso do restaurante</p>
         </div>
 
         <form onSubmit={handleSubmit} className="bg-white p-8 rounded-2xl shadow-card border border-stone-100 space-y-5">

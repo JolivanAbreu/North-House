@@ -146,7 +146,7 @@ const Clientes = () => {
     <div className="animate-fadeIn pb-16">
       <PageHeader
         title="Clientes"
-        subtitle="Todo o cliente que já fez um pedido pela sua vitrine aparece aqui automaticamente."
+        subtitle="Clientes de delivery e retirada (com telefone) aparecem aqui automaticamente."
       />
 
       <div className="relative max-w-md mb-6">
@@ -168,7 +168,7 @@ const Clientes = () => {
         </div>
       ) : clientesFiltrados.length === 0 ? (
         <Card>
-          <EmptyState icon={Users} title="Nenhum cliente ainda" description="Assim que alguém fizer um pedido pela vitrine, ele aparece aqui." />
+          <EmptyState icon={Users} title="Nenhum cliente ainda" description="Ao lançar um pedido de delivery ou retirada com telefone, o cliente aparece aqui." />
         </Card>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-start">

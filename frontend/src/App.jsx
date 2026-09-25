@@ -1,78 +1,78 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 
-// Layouts e Rotas Protegidas
+// Layout e rota protegida
 import Painel from './pages/admin/Painel.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
-import PublicLayout from './components/PublicLayout.jsx';
 
-// Páginas Admin
+// Autenticação
 import Login from './pages/Login.jsx';
 import Registro from './pages/Registro.jsx';
-import Dashboard from './pages/admin/Dashboard.jsx';
+import EsqueciSenha from './pages/EsqueciSenha.jsx';
+import RedefinirSenha from './pages/RedefinirSenha.jsx';
+
+// Painel do restaurante
 import Comandas from './pages/admin/Comandas.jsx';
+import Dashboard from './pages/admin/Dashboard.jsx';
 import GerenciarCategorias from './pages/admin/GerenciarCategorias.jsx';
 import GerenciarProdutos from './pages/admin/GerenciarProdutos.jsx';
 import GerenciarPedidos from './pages/admin/GerenciarPedidos.jsx';
-import GerenciarCupons from './pages/admin/GerenciarCupons.jsx';
 import Relatorios from './pages/admin/Relatorios.jsx';
 import PerfilDaLoja from './pages/admin/PerfilDaLoja.jsx';
 import Equipe from './pages/admin/Equipe.jsx';
 import Clientes from './pages/admin/Clientes.jsx';
-import EsqueciSenha from './pages/EsqueciSenha.jsx';
-import RedefinirSenha from './pages/RedefinirSenha.jsx';
 
-// Páginas Públicas
-import Vitrine from './pages/public/Vitrine.jsx';
-import Carrinho from './pages/public/Carrinho.jsx';
-import PedidoStatus from './pages/public/PedidoStatus.jsx';
-
-// Erro
 import NotFound from './pages/NotFound.jsx';
 
+// O sistema do Casa Nova é de uso interno do restaurante: não existe mais
+// vitrine pública, carrinho nem página de status de pedido para o cliente.
 function App() {
   return (
-    <Routes>
-      {/* Rotas Públicas (Vitrine, Carrinho, Status do Pedido) */}
-      <Route element={<PublicLayout />}>
-        <Route path="/loja/:usuarioId" element={<Vitrine />} />
-        <Route path="/carrinho" element={<Carrinho />} />
-        <Route path="/pedido/:token" element={<PedidoStatus />} />
-      </Route>
+    <>
+      <Toaster
+        position="top-center"
+        toastOptions={{
+          duration: 3000,
+          style: { borderRadius: '12px', fontSize: '14px' },
+        }}
+      />
 
-      {/* Rotas de Autenticação (Admin) */}
-      <Route path="/login" element={<Login />} />
-      <Route path="/registro" element={<Registro />} />
-      <Route path="/esqueci-senha" element={<EsqueciSenha />} />
-      <Route path="/redefinir-senha/:token" element={<RedefinirSenha />} />
+      <Routes>
+        {/* Autenticação */}
+        <Route path="/login" element={<Login />} />
+        <Route path="/registro" element={<Registro />} />
+        <Route path="/esqueci-senha" element={<EsqueciSenha />} />
+        <Route path="/redefinir-senha/:token" element={<RedefinirSenha />} />
 
-      {/* Rotas Protegidas (Painel Admin) */}
-      <Route
-        path="/admin"
-        element={
-          <ProtectedRoute>
-            <Painel />
-          </ProtectedRoute>
-        }
-      >
-        <Route index element={<Comandas />} />
-        <Route path="dashboard" element={<Dashboard />} />
-        <Route path="categorias" element={<GerenciarCategorias />} />
-        <Route path="produtos" element={<GerenciarProdutos />} />
-        <Route path="pedidos" element={<GerenciarPedidos />} />
-        <Route path="cupons" element={<GerenciarCupons />} />
-        <Route path="relatorios" element={<Relatorios />} />
-        <Route path="perfil" element={<PerfilDaLoja />} />
-        <Route path="clientes" element={<Clientes />} />
-        <Route path="equipe" element={<Equipe />} />
-      </Route>
+        {/* Painel */}
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <Painel />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<Comandas />} />
+          <Route path="dashboard" element={<Dashboard />} />
+          <Route path="cardapio" element={<GerenciarProdutos tipoFixo="cardapio" />} />
+          <Route path="mercearia" element={<GerenciarProdutos tipoFixo="mercearia" />} />
+          <Route path="produtos" element={<Navigate to="/admin/cardapio" replace />} />
+          <Route path="categorias" element={<GerenciarCategorias />} />
+          <Route path="pedidos" element={<GerenciarPedidos />} />
+          <Route path="relatorios" element={<Relatorios />} />
+          <Route path="perfil" element={<PerfilDaLoja />} />
+          <Route path="clientes" element={<Clientes />} />
+          <Route path="equipe" element={<Equipe />} />
+        </Route>
 
-      {/* Rota Raiz */}
-      <Route path="/" element={<Navigate to="/loja/1" replace />} />
+        {/* A raiz leva direto para as comandas (ou para o login, se deslogado) */}
+        <Route path="/" element={<Navigate to="/admin" replace />} />
 
-      {/* 404 */}
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </>
   );
 }
 

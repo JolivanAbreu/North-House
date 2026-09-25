@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import {
   Package,
@@ -8,8 +8,12 @@ import {
   Plus,
   EyeOff,
   Eye,
-  Layers,
+  Search,
+  PackagePlus,
+  Barcode,
+  AlertTriangle,
 } from "lucide-react";
+import { IMaskInput } from "react-imask";
 import toast from "react-hot-toast";
 import api from "../../services/api.mjs";
 import ConfirmationModal from "../../components/ConfirmationModal.jsx";
@@ -17,9 +21,25 @@ import PageHeader from "../../components/ui/PageHeader.jsx";
 import { Card, CardBody } from "../../components/ui/Card.jsx";
 import EmptyState from "../../components/ui/EmptyState.jsx";
 import { inputClasses, Field } from "../../components/ui/Input.jsx";
-import { formatCurrency, formatPrecoUnidade } from "../../utils/format.mjs";
+import { formatCurrency, formatPrecoUnidade, formatQuantidade } from "../../utils/format.mjs";
+import { capitalizarNome } from "../../utils/mascaras.mjs";
 
-const GerenciarProdutos = () => {
+// Abaixo desse saldo o produto da mercearia ganha a tag "Repor".
+const ESTOQUE_BAIXO = { unidade: 5, kg: 2 };
+
+const estaComEstoqueBaixo = (produto) => {
+  if (produto.quantidade_em_estoque === null || produto.quantidade_em_estoque === undefined) return false;
+  const limite = ESTOQUE_BAIXO[produto.unidade_venda] ?? ESTOQUE_BAIXO.unidade;
+  return parseFloat(produto.quantidade_em_estoque) <= limite;
+};
+
+const TITULOS = {
+  cardapio: { titulo: "Cardápio", subtitulo: "Pratos e bebidas do restaurante, separados por categoria" },
+  mercearia: { titulo: "Mercearia", subtitulo: "Produtos de prateleira, com controle de estoque e reposição" },
+};
+
+// tipoFixo = "cardapio" | "mercearia": cada um tem sua aba na navbar.
+const GerenciarProdutos = ({ tipoFixo }) => {
   const [produtos, setProdutos] = useState([]);
   const [categorias, setCategorias] = useState([]);
   const [loadingList, setLoadingList] = useState(true);
@@ -38,7 +58,23 @@ const GerenciarProdutos = () => {
   const [disponivel, setDisponivel] = useState(true);
   const [alternandoDisponibilidade, setAlternandoDisponibilidade] = useState(null);
   const [unidadeVenda, setUnidadeVenda] = useState("unidade");
-  const [abaTipo, setAbaTipo] = useState("cardapio");
+  const [abaTipo, setAbaTipo] = useState(tipoFixo || "cardapio");
+  const [busca, setBusca] = useState("");
+  const [codigoBarras, setCodigoBarras] = useState("");
+  const [estoque, setEstoque] = useState("");
+
+  // Reposição rápida de estoque (mercearia)
+  const [produtoReposicao, setProdutoReposicao] = useState(null);
+  const [qtdReposicao, setQtdReposicao] = useState("");
+  const [salvandoReposicao, setSalvandoReposicao] = useState(false);
+
+  // Troca de aba pela navbar (Cardápio <-> Mercearia) reaproveita o componente
+  useEffect(() => {
+    if (tipoFixo) {
+      setAbaTipo(tipoFixo);
+      setBusca("");
+    }
+  }, [tipoFixo]);
 
   // Variações (ex: tamanhos, sabores) do produto em edição
   const [variacoes, setVariacoes] = useState([]);
@@ -51,7 +87,7 @@ const GerenciarProdutos = () => {
   }, []);
 
   useEffect(() => {
-    if (showFormModal) {
+    if (showFormModal || produtoReposicao) {
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "unset";
@@ -59,7 +95,7 @@ const GerenciarProdutos = () => {
     return () => {
       document.body.style.overflow = "unset";
     };
-  }, [showFormModal]);
+  }, [showFormModal, produtoReposicao]);
 
   const fetchProdutos = async () => {
     try {
@@ -98,6 +134,8 @@ const GerenciarProdutos = () => {
     setNovaVariacaoNome("");
     setNovaVariacaoAjuste("");
     setUnidadeVenda("unidade");
+    setCodigoBarras("");
+    setEstoque("");
   };
 
   const handleFecharModal = () => {
@@ -113,6 +151,56 @@ const GerenciarProdutos = () => {
   const produtosDaAba = produtos.filter(
     (p) => (p.Categoria?.tipo || "cardapio") === abaTipo,
   );
+
+  const ehMercearia = abaTipo === "mercearia";
+
+  // Busca por nome ou código de barras + agrupamento por categoria
+  const gruposPorCategoria = useMemo(() => {
+    const termo = busca.trim().toLowerCase();
+    const filtrados = produtosDaAba.filter(
+      (p) =>
+        !termo ||
+        p.nome.toLowerCase().includes(termo) ||
+        (p.codigo_barras || "").includes(termo),
+    );
+    const grupos = new Map();
+    for (const produto of filtrados) {
+      const nomeCategoria = produto.Categoria?.nome || "Sem categoria";
+      if (!grupos.has(nomeCategoria)) grupos.set(nomeCategoria, []);
+      grupos.get(nomeCategoria).push(produto);
+    }
+    return [...grupos.entries()]
+      .sort(([a], [b]) => a.localeCompare(b, "pt-BR"))
+      .map(([categoria, itens]) => [
+        categoria,
+        itens.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")),
+      ]);
+  }, [produtosDaAba, busca]);
+
+  const qtdEstoqueBaixo = ehMercearia
+    ? produtosDaAba.filter(estaComEstoqueBaixo).length
+    : 0;
+
+  const handleConfirmarReposicao = async () => {
+    const qtd = parseFloat(String(qtdReposicao).replace(",", "."));
+    if (!produtoReposicao || !qtd || qtd <= 0) {
+      toast.error("Informe uma quantidade válida.");
+      return;
+    }
+    setSalvandoReposicao(true);
+    try {
+      // PUT só com quantidade_em_estoque = soma ao saldo atual (reposição)
+      await api.put(`/produtos/${produtoReposicao.id}`, { quantidade_em_estoque: qtd });
+      toast.success(`Estoque de "${produtoReposicao.nome}" atualizado!`);
+      setProdutoReposicao(null);
+      setQtdReposicao("");
+      fetchProdutos();
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Erro ao repor estoque.");
+    } finally {
+      setSalvandoReposicao(false);
+    }
+  };
 
   const handleAbrirNovoProduto = () => {
     resetForm();
@@ -176,7 +264,7 @@ const GerenciarProdutos = () => {
       toast.success(
         novoValor
           ? "Produto disponível novamente."
-          : "Produto pausado (some da vitrine).",
+          : "Produto pausado (não aparece ao lançar itens na comanda).",
       );
     } catch (error) {
       console.error("Erro ao alternar disponibilidade:", error);
@@ -197,13 +285,17 @@ const GerenciarProdutos = () => {
     setSalvando(true);
 
     const payload = {
-      nome,
+      nome: capitalizarNome(nome),
       descricao,
       CategoriaId: categoriaId,
       preco_venda: precoVenda,
       disponivel,
-      unidade_venda: unidadeVenda
+      unidade_venda: unidadeVenda,
     };
+    if (ehMercearia) {
+      payload.codigo_barras = codigoBarras;
+      payload.quantidade_em_estoque = estoque === "" ? "" : String(estoque).replace(",", ".");
+    }
 
     try {
       if (editandoId) {
@@ -250,7 +342,11 @@ const GerenciarProdutos = () => {
     );
     setDisponivel(produto.disponivel !== false);
     setUnidadeVenda(produto.unidade_venda || "unidade");
-    setAbaTipo(produto.Categoria?.tipo || "cardapio");
+    setCodigoBarras(produto.codigo_barras || "");
+    setEstoque(
+      produto.quantidade_em_estoque != null ? String(parseFloat(produto.quantidade_em_estoque)) : "",
+    );
+    if (!tipoFixo) setAbaTipo(produto.Categoria?.tipo || "cardapio");
     fetchVariacoes(produto.id);
     setShowFormModal(true);
   };
@@ -258,8 +354,8 @@ const GerenciarProdutos = () => {
   return (
     <div className="animate-fadeIn pb-12 w-full max-w-full">
       <PageHeader
-        title="Gerenciar Produtos"
-        subtitle="Cadastre e edite os produtos da sua loja"
+        title={tipoFixo ? TITULOS[tipoFixo].titulo : "Produtos"}
+        subtitle={tipoFixo ? TITULOS[tipoFixo].subtitulo : "Cadastre e edite os produtos do Casa Nova"}
         action={
           <button
             onClick={handleAbrirNovoProduto}
@@ -270,115 +366,222 @@ const GerenciarProdutos = () => {
         }
       />
 
-      {/* Abas: Cardápio vs Mercearia */}
-      <div className="flex flex-wrap gap-2 mb-6 border-b border-stone-200 pb-3">
-        <button
-          onClick={() => setAbaTipo("cardapio")}
-          className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-            abaTipo === "cardapio"
-              ? "bg-brand-600 text-white shadow-soft"
-              : "bg-white text-stone-600 border border-stone-200 hover:bg-stone-50"
-          }`}
-        >
-          Cardápio
-        </button>
-        <button
-          onClick={() => setAbaTipo("mercearia")}
-          className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-            abaTipo === "mercearia"
-              ? "bg-amber-600 text-white shadow-soft"
-              : "bg-white text-stone-600 border border-stone-200 hover:bg-stone-50"
-          }`}
-        >
-          Mercearia
-        </button>
+      {/* Abas: Cardápio vs Mercearia (só quando a página não vem fixa pela navbar) */}
+      {!tipoFixo && (
+        <div className="flex flex-wrap gap-2 mb-6 border-b border-stone-200 pb-3">
+          {["cardapio", "mercearia"].map((tipo) => (
+            <button
+              key={tipo}
+              onClick={() => setAbaTipo(tipo)}
+              className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+                abaTipo === tipo
+                  ? tipo === "cardapio" ? "bg-brand-600 text-white shadow-soft" : "bg-amber-600 text-white shadow-soft"
+                  : "bg-white text-stone-600 border border-stone-200 hover:bg-stone-50"
+              }`}
+            >
+              {TITULOS[tipo].titulo}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Busca + aviso de estoque baixo */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-6">
+        <div className="relative flex-1">
+          <Search className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder={ehMercearia ? "Buscar por nome ou código de barras..." : "Buscar no cardápio..."}
+            className={`${inputClasses} pl-10`}
+          />
+        </div>
+        {qtdEstoqueBaixo > 0 && (
+          <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm font-medium">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            {qtdEstoqueBaixo} produto(s) precisando de reposição
+          </div>
+        )}
       </div>
 
-      {/* Lista de Produtos */}
-      <Card className="w-full">
-        <CardBody className="p-4 sm:p-6 w-full">
-          {loadingList ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="h-28 bg-stone-100 rounded-2xl animate-pulse w-full"
-                />
-              ))}
-            </div>
-          ) : produtosDaAba.length === 0 ? (
+      {/* Lista de Produtos agrupada por categoria */}
+      {loadingList ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-28 bg-stone-100 rounded-2xl animate-pulse w-full" />
+          ))}
+        </div>
+      ) : gruposPorCategoria.length === 0 ? (
+        <Card>
+          <CardBody>
             <EmptyState
               icon={Package}
-              title={`Nenhum produto em ${abaTipo === "cardapio" ? "Cardápio" : "Mercearia"}`}
-              description="Clique em 'Novo produto' para adicionar o primeiro item nesta seção."
+              title={busca ? "Nenhum produto encontrado" : `Nenhum produto em ${TITULOS[abaTipo].titulo}`}
+              description={busca ? "Tente outro nome ou código." : "Clique em 'Novo produto' para adicionar o primeiro item nesta seção."}
             />
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 w-full">
-              {produtosDaAba.map((produto) => (
-                <div
-                  key={produto.id}
-                  className={`bg-white rounded-2xl border border-stone-100 p-4 flex flex-col justify-between transition-all duration-200 shadow-card hover:shadow-lifted w-full min-w-0 ${
-                    !produto.disponivel ? "opacity-60 bg-stone-50/50" : ""
-                  }`}
-                >
-                  <div className="min-w-0">
-                    <div className="flex justify-between items-start gap-2 mb-2 min-w-0">
-                      <h3 className="font-bold text-stone-900 text-base leading-tight truncate">
-                        {produto.nome}
-                      </h3>
-                      <button
-                        onClick={() => handleToggleDisponibilidade(produto)}
-                        disabled={alternandoDisponibilidade === produto.id}
-                        className={`p-1.5 rounded-lg text-xs font-semibold transition-colors shrink-0 ${
-                          produto.disponivel
-                            ? "bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
-                            : "bg-stone-100 text-stone-500 hover:bg-stone-200"
-                        }`}
-                        title={produto.disponivel ? "Clique para pausar" : "Clique para ativar"}
-                      >
-                        {produto.disponivel ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                      </button>
-                    </div>
-                    <p className="text-xs font-semibold text-brand-600 mb-2 truncate">
-                      {produto.Categoria?.nome || "Sem categoria"}
-                    </p>
-                    {produto.descricao && (
-                      <p className="text-xs text-stone-500 line-clamp-2 mb-3 break-words">
-                        {produto.descricao}
-                      </p>
-                    )}
-                  </div>
+          </CardBody>
+        </Card>
+      ) : (
+        <div className="space-y-8">
+          {gruposPorCategoria.map(([categoria, itens]) => (
+            <section key={categoria}>
+              <h2 className="flex items-center gap-3 text-xs font-bold uppercase tracking-wider text-stone-500 mb-3">
+                {categoria}
+                <span className="text-stone-400 font-semibold normal-case tracking-normal">({itens.length})</span>
+                <span className="h-px bg-stone-200 flex-1" />
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 w-full">
+                {itens.map((produto) => {
+                  const estoqueBaixo = ehMercearia && estaComEstoqueBaixo(produto);
+                  const temEstoque = produto.quantidade_em_estoque !== null && produto.quantidade_em_estoque !== undefined;
+                  return (
+                    <div
+                      key={produto.id}
+                      className={`bg-white rounded-2xl border p-4 flex flex-col justify-between transition-all duration-200 shadow-card hover:shadow-lifted w-full min-w-0 ${
+                        estoqueBaixo ? "border-amber-300" : "border-stone-100"
+                      } ${!produto.disponivel ? "opacity-60 bg-stone-50/50" : ""}`}
+                    >
+                      <div className="min-w-0">
+                        <div className="flex justify-between items-start gap-2 mb-2 min-w-0">
+                          <h3 className="font-bold text-stone-900 text-base leading-tight truncate">
+                            {produto.nome}
+                          </h3>
+                          <button
+                            onClick={() => handleToggleDisponibilidade(produto)}
+                            disabled={alternandoDisponibilidade === produto.id}
+                            className={`p-1.5 rounded-lg text-xs font-semibold transition-colors shrink-0 ${
+                              produto.disponivel
+                                ? "bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+                                : "bg-stone-100 text-stone-500 hover:bg-stone-200"
+                            }`}
+                            title={produto.disponivel ? "Clique para pausar" : "Clique para ativar"}
+                          >
+                            {produto.disponivel ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                          </button>
+                        </div>
+                        {produto.descricao && (
+                          <p className="text-xs text-stone-500 line-clamp-2 mb-2 break-words">{produto.descricao}</p>
+                        )}
+                        {ehMercearia && (
+                          <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                            {temEstoque ? (
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold ${
+                                estoqueBaixo ? "bg-amber-100 text-amber-800" : "bg-stone-100 text-stone-600"
+                              }`}>
+                                Estoque: {formatQuantidade(produto.quantidade_em_estoque)} {produto.unidade_venda === "kg" ? "kg" : "un"}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-stone-50 text-stone-400">
+                                Sem controle de estoque
+                              </span>
+                            )}
+                            {estoqueBaixo && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-500 text-white">Repor</span>
+                            )}
+                            {produto.codigo_barras && (
+                              <span className="inline-flex items-center gap-1 text-[11px] text-stone-400 font-mono">
+                                <Barcode className="w-3 h-3" /> {produto.codigo_barras}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
 
-                  <div className="pt-3 mt-auto border-t border-stone-100 flex items-center justify-between min-w-0">
-                    <span className="font-bold text-stone-900 text-sm truncate">
-                      {formatPrecoUnidade(
-                        produto.preco_venda,
-                        produto.unidade_venda,
-                      )}
-                    </span>
-                    <div className="flex gap-1 shrink-0">
-                      <button
-                        onClick={() => handleEditProduto(produto)}
-                        className="p-2 text-stone-400 hover:text-brand-600 hover:bg-brand-50 rounded-xl transition-colors"
-                        title="Editar"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => setProdutoParaDeletar(produto)}
-                        className="p-2 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors"
-                        title="Excluir"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="pt-3 mt-auto border-t border-stone-100 flex items-center justify-between min-w-0">
+                        <span className="font-bold text-stone-900 text-sm truncate">
+                          {formatPrecoUnidade(produto.preco_venda, produto.unidade_venda)}
+                        </span>
+                        <div className="flex gap-1 shrink-0">
+                          {ehMercearia && (
+                            <button
+                              onClick={() => { setProdutoReposicao(produto); setQtdReposicao(""); }}
+                              className="p-2 text-stone-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors"
+                              title="Repor estoque"
+                            >
+                              <PackagePlus className="w-4 h-4" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleEditProduto(produto)}
+                            className="p-2 text-stone-400 hover:text-brand-600 hover:bg-brand-50 rounded-xl transition-colors"
+                            title="Editar"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => setProdutoParaDeletar(produto)}
+                            className="p-2 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors"
+                            title="Excluir"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              ))}
+                  );
+                })}
+              </div>
+            </section>
+          ))}
+        </div>
+      )}
+
+      {/* Modal de reposição rápida de estoque */}
+      {produtoReposicao && isMounted && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setProdutoReposicao(null)}
+        >
+          <div
+            className="bg-white p-6 rounded-3xl shadow-2xl border border-stone-100 w-full max-w-sm animate-slideUp"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h2 className="text-lg font-bold font-display text-stone-900">Repor estoque</h2>
+                <p className="text-sm text-stone-500">{produtoReposicao.nome}</p>
+              </div>
+              <button onClick={() => setProdutoReposicao(null)} className="text-stone-400 hover:text-stone-700 p-1.5 rounded-xl hover:bg-stone-100">
+                <X className="w-5 h-5" />
+              </button>
             </div>
-          )}
-        </CardBody>
-      </Card>
+            <p className="text-xs text-stone-500 mb-3">
+              Saldo atual: <strong>{produtoReposicao.quantidade_em_estoque != null ? formatQuantidade(produtoReposicao.quantidade_em_estoque) : 0} {produtoReposicao.unidade_venda === "kg" ? "kg" : "un"}</strong>. A quantidade informada é somada ao saldo.
+            </p>
+            <Field label={`Quantidade recebida (${produtoReposicao.unidade_venda === "kg" ? "kg" : "unidades"})`}>
+              <IMaskInput
+                mask={Number}
+                scale={produtoReposicao.unidade_venda === "kg" ? 3 : 0}
+                radix=","
+                mapToRadix={["."]}
+                thousandsSeparator="."
+                min={0}
+                unmask
+                value={qtdReposicao}
+                onAccept={(v) => setQtdReposicao(v)}
+                onKeyDown={(e) => e.key === "Enter" && handleConfirmarReposicao()}
+                className={inputClasses}
+                placeholder={produtoReposicao.unidade_venda === "kg" ? "0,000" : "0"}
+                autoFocus
+              />
+            </Field>
+            <div className="flex justify-end gap-3 mt-5">
+              <button onClick={() => setProdutoReposicao(null)} className="px-5 py-2.5 bg-stone-100 text-stone-700 rounded-xl font-semibold text-sm hover:bg-stone-200">
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmarReposicao}
+                disabled={salvandoReposicao}
+                className="px-5 py-2.5 bg-emerald-600 text-white rounded-xl font-semibold text-sm hover:bg-emerald-700 disabled:bg-stone-300"
+              >
+                {salvandoReposicao ? "Salvando..." : "Confirmar"}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* Modal Formulário (Novo/Editar Produto) usando createPortal */}
       {showFormModal && isMounted && createPortal(
@@ -408,7 +611,7 @@ const GerenciarProdutos = () => {
                   type="text"
                   value={nome}
                   onChange={(e) => setNome(e.target.value)}
-                  placeholder="Ex: Bolo de Cenoura"
+                  placeholder={ehMercearia ? "Ex: Arroz Tipo 1 5kg" : "Ex: Baião de Dois"}
                   className={inputClasses}
                   required
                 />
@@ -443,23 +646,65 @@ const GerenciarProdutos = () => {
                 </Field>
               </div>
 
-              <Field label="Preço de venda (R$)">
-                <input
-                  type="number"
-                  step="0.01"
-                  value={precoVenda}
-                  onChange={(e) => setPrecoVenda(e.target.value)}
-                  placeholder="0.00"
-                  className={inputClasses}
-                  required
-                />
+              <Field label={`Preço de venda ${unidadeVenda === "kg" ? "(por kg)" : "(por unidade)"}`}>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-semibold text-stone-400">R$</span>
+                  <IMaskInput
+                    mask={Number}
+                    scale={2}
+                    radix=","
+                    mapToRadix={["."]}
+                    thousandsSeparator="."
+                    padFractionalZeros
+                    normalizeZeros
+                    min={0}
+                    unmask
+                    value={precoVenda === "" || precoVenda == null ? "" : String(precoVenda)}
+                    onAccept={(v) => setPrecoVenda(v)}
+                    className={`${inputClasses} pl-10`}
+                    placeholder="0,00"
+                  />
+                </div>
               </Field>
+
+              {ehMercearia && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Field label="Código de barras (opcional)" help="Com o leitor, clique aqui e bipe o produto.">
+                    <div className="relative">
+                      <Barcode className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <IMaskInput
+                        mask="0000000000000"
+                        value={codigoBarras}
+                        onAccept={(v) => setCodigoBarras(v)}
+                        onKeyDown={(e) => e.key === "Enter" && e.preventDefault()}
+                        className={`${inputClasses} pl-10 font-mono`}
+                        placeholder="7891234567890"
+                      />
+                    </div>
+                  </Field>
+                  <Field label={`Estoque atual (${unidadeVenda === "kg" ? "kg" : "un"})`} help="Deixe vazio para não controlar estoque.">
+                    <IMaskInput
+                      mask={Number}
+                      scale={unidadeVenda === "kg" ? 3 : 0}
+                      radix=","
+                      mapToRadix={["."]}
+                      thousandsSeparator="."
+                      min={0}
+                      unmask
+                      value={estoque === "" ? "" : String(estoque).replace(",", ".")}
+                      onAccept={(v) => setEstoque(v)}
+                      className={inputClasses}
+                      placeholder="Ex: 24"
+                    />
+                  </Field>
+                </div>
+              )}
 
               <Field label="Descrição (opcional)">
                 <textarea
                   value={descricao}
                   onChange={(e) => setDescricao(e.target.value)}
-                  placeholder="Ingredientes, detalhes do produto..."
+                  placeholder={ehMercearia ? "Marca, peso da embalagem..." : "Acompanhamentos, detalhes do prato..."}
                   rows={2}
                   className={inputClasses}
                 />

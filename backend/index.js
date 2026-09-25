@@ -43,8 +43,9 @@ Categoria.belongsTo(Usuario);
 Usuario.hasMany(Produto);
 Produto.belongsTo(Usuario);
 
-Categoria.hasMany(Produto);
-Produto.belongsTo(Categoria);
+// Chave explícita (ver comentário em models/Categoria.js sobre "Categorium").
+Categoria.hasMany(Produto, { foreignKey: 'CategoriaId' });
+Produto.belongsTo(Categoria, { foreignKey: 'CategoriaId' });
 
 Produto.belongsToMany(Insumo, {
   through: FichaTecnica,

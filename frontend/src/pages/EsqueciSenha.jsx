@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Store, Mail, ArrowLeft } from 'lucide-react';
+import { Mail, ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../services/api.mjs';
 import { inputClasses, Field } from '../components/ui/Input.jsx';
+import Logo from '../components/Logo.jsx';
 
 const EsqueciSenha = () => {
   const [email, setEmail] = useState('');
@@ -28,9 +29,7 @@ const EsqueciSenha = () => {
     <div className="flex items-center justify-center min-h-screen bg-stone-50 px-4">
       <div className="w-full max-w-sm animate-slideUp">
         <div className="flex flex-col items-center mb-8">
-          <span className="w-12 h-12 rounded-2xl bg-brand-600 flex items-center justify-center shadow-soft mb-3">
-            <Store className="w-6 h-6 text-white" />
-          </span>
+          <Logo size="lg" className="mb-3" />
           <h2 className="text-2xl font-bold font-display text-stone-900">Redefinir senha</h2>
           <p className="text-stone-500 text-sm mt-1 text-center">
             Informe seu e-mail e enviaremos um link para criar uma nova senha.

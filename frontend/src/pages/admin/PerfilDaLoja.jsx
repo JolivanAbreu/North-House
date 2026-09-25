@@ -2,30 +2,12 @@ import React, { useState, useEffect } from 'react';
 import api from '../../services/api.mjs';
 import toast from 'react-hot-toast';
 import { IMaskInput } from 'react-imask';
-import { Store, Phone, Instagram, Clock, Archive, PauseCircle, PlayCircle } from 'lucide-react';
+import { Store, Phone, Instagram } from 'lucide-react';
 import Spinner from '../../components/Spinner.jsx';
 import PageHeader from '../../components/ui/PageHeader.jsx';
-import { Card, CardBody, CardHeader } from '../../components/ui/Card.jsx';
+import { Card, CardBody } from '../../components/ui/Card.jsx';
 import { inputClasses, Field } from '../../components/ui/Input.jsx';
 import useAuth from '../../hooks/useAuth.mjs';
-
-const DIAS = [
-  { chave: 'dom', label: 'Domingo' },
-  { chave: 'seg', label: 'Segunda' },
-  { chave: 'ter', label: 'Terça' },
-  { chave: 'qua', label: 'Quarta' },
-  { chave: 'qui', label: 'Quinta' },
-  { chave: 'sex', label: 'Sexta' },
-  { chave: 'sab', label: 'Sábado' },
-];
-
-const horariosPadrao = () => {
-  const obj = {};
-  DIAS.forEach(({ chave }) => {
-    obj[chave] = { ativo: chave !== 'dom', abre: '08:00', fecha: '18:00' };
-  });
-  return obj;
-};
 
 const PerfilDaLoja = () => {
   const { ehDono } = useAuth();
@@ -33,8 +15,6 @@ const PerfilDaLoja = () => {
   const [whatsapp, setWhatsapp] = useState('');
   const [instagram, setInstagram] = useState('');
   const [diasParaArquivar, setDiasParaArquivar] = useState(30);
-  const [horarios, setHorarios] = useState(horariosPadrao());
-  const [lojaPausada, setLojaPausada] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -46,15 +26,13 @@ const PerfilDaLoja = () => {
         const response = await api.get('/perfil');
         const {
           nome_loja, telefone_whatsapp, link_instagram,
-          dias_para_arquivar_pedidos, horarios_funcionamento, loja_pausada,
+          dias_para_arquivar_pedidos,
         } = response.data;
 
         if (nome_loja) setNomeLoja(nome_loja);
         if (telefone_whatsapp) setWhatsapp(telefone_whatsapp);
         if (link_instagram) setInstagram(link_instagram);
         if (dias_para_arquivar_pedidos) setDiasParaArquivar(dias_para_arquivar_pedidos);
-        if (horarios_funcionamento) setHorarios(horarios_funcionamento);
-        setLojaPausada(Boolean(loja_pausada));
       } catch (error) {
         console.error("Erro ao buscar perfil:", error);
         toast.error("Não foi possível carregar seu perfil.");
@@ -65,13 +43,6 @@ const PerfilDaLoja = () => {
 
     fetchPerfil();
   }, []);
-
-  const atualizarDia = (chave, campo, valor) => {
-    setHorarios((prev) => ({
-      ...prev,
-      [chave]: { ...prev[chave], [campo]: valor },
-    }));
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -91,8 +62,6 @@ const PerfilDaLoja = () => {
         telefone_whatsapp: telefoneLimpo,
         link_instagram: instagram,
         dias_para_arquivar_pedidos: diasParaArquivar,
-        horarios_funcionamento: JSON.stringify(horarios),
-        loja_pausada: lojaPausada,
       });
       toast.success("Perfil atualizado com sucesso!");
     } catch (error) {
@@ -114,8 +83,8 @@ const PerfilDaLoja = () => {
   return (
     <div className="max-w-2xl mx-auto animate-fadeIn">
       <PageHeader
-        title="Perfil da Loja"
-        subtitle="Estas informações aparecem publicamente na vitrine e na página de status do pedido."
+        title="Configurações da loja"
+        subtitle="Contatos que saem no comprovante impresso e regras de arquivamento das comandas."
       />
 
       {!ehDono && (
@@ -128,7 +97,7 @@ const PerfilDaLoja = () => {
         <Card>
           <CardBody className="pt-6">
             <form onSubmit={handleSubmit} className="space-y-5">
-              <Field label="Nome da Loja">
+              <Field label="Nome da loja" help="O nome exibido no sistema e no comprovante é Casa Nova.">
                 <div className="relative">
                   <Store className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
@@ -136,7 +105,7 @@ const PerfilDaLoja = () => {
                     value={nomeLoja}
                     onChange={(e) => setNomeLoja(e.target.value)}
                     className={`${inputClasses} pl-10`}
-                    placeholder="Ex: Doceria da Maria"
+                    placeholder="Casa Nova"
                   />
                 </div>
               </Field>
@@ -162,12 +131,12 @@ const PerfilDaLoja = () => {
                     value={instagram}
                     onChange={(e) => setInstagram(e.target.value)}
                     className={`${inputClasses} pl-10`}
-                    placeholder="https://www.instagram.com/seunegocio"
+                    placeholder="https://www.instagram.com/casanova"
                   />
                 </div>
               </Field>
 
-              <Field label="Arquivar pedidos concluídos/cancelados após (dias)" help="Depois desse prazo, esses pedidos somem da tela principal e ficam na aba Arquivados.">
+              <Field label="Arquivar comandas finalizadas após (dias)" help="Depois desse prazo, as comandas pagas saem do histórico principal, mas continuam nos relatórios.">
                 <input
                   type="number"
                   min="1"
@@ -176,23 +145,6 @@ const PerfilDaLoja = () => {
                   className={inputClasses}
                 />
               </Field>
-
-              <div className="flex items-center justify-between p-4 bg-stone-50 border border-stone-100 rounded-xl">
-                <div className="flex items-start gap-3">
-                  {lojaPausada ? <PauseCircle className="w-5 h-5 text-rose-500 mt-0.5" /> : <PlayCircle className="w-5 h-5 text-emerald-500 mt-0.5" />}
-                  <div>
-                    <p className="text-sm font-semibold text-stone-800">Pausar loja agora</p>
-                    <p className="text-xs text-stone-500 mt-0.5">Fecha a vitrine para novos pedidos imediatamente, independente do horário configurado abaixo.</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setLojaPausada((v) => !v)}
-                  className={`relative w-12 h-7 rounded-full transition-colors flex-shrink-0 ${lojaPausada ? "bg-rose-500" : "bg-stone-300"}`}
-                >
-                  <span className={`absolute top-1 left-1 w-5 h-5 bg-white rounded-full shadow transition-transform ${lojaPausada ? "translate-x-5" : "translate-x-0"}`} />
-                </button>
-              </div>
 
               <div className="text-right pt-2">
                 <button
@@ -207,58 +159,6 @@ const PerfilDaLoja = () => {
           </CardBody>
         </Card>
 
-        <Card>
-          <CardHeader title="Horário de funcionamento" subtitle={<span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> Fora desses horários, a vitrine fica visível mas não aceita novos pedidos.</span>} />
-          <CardBody>
-            <div className="space-y-2">
-              {DIAS.map(({ chave, label }) => (
-                <div key={chave} className="flex flex-wrap items-center gap-3 p-3 rounded-xl border border-stone-100 bg-stone-50">
-                  <label className="flex items-center gap-2 w-32 shrink-0 text-sm font-medium text-stone-700">
-                    <input
-                      type="checkbox"
-                      checked={horarios[chave]?.ativo ?? false}
-                      onChange={(e) => atualizarDia(chave, 'ativo', e.target.checked)}
-                      className="w-4 h-4 rounded accent-brand-600"
-                    />
-                    {label}
-                  </label>
-                  {horarios[chave]?.ativo ? (
-                    <div className="flex items-center gap-2 text-sm">
-                      <input
-                        type="time"
-                        value={horarios[chave]?.abre || '08:00'}
-                        onChange={(e) => atualizarDia(chave, 'abre', e.target.value)}
-                        className="px-2.5 py-1.5 rounded-lg border border-stone-200 bg-white"
-                      />
-                      <span className="text-stone-400">até</span>
-                      <input
-                        type="time"
-                        value={horarios[chave]?.fecha || '18:00'}
-                        onChange={(e) => atualizarDia(chave, 'fecha', e.target.value)}
-                        className="px-2.5 py-1.5 rounded-lg border border-stone-200 bg-white"
-                      />
-                    </div>
-                  ) : (
-                    <span className="text-xs text-stone-400">Fechado</span>
-                  )}
-                </div>
-              ))}
-            </div>
-            {ehDono && (
-              <div className="text-right pt-4">
-                <button
-                  type="button"
-                  onClick={handleSubmit}
-                  disabled={saving}
-                  className="bg-stone-800 text-white px-8 py-2.5 rounded-xl font-semibold hover:bg-stone-900 transition-colors disabled:bg-stone-300 inline-flex items-center gap-2"
-                >
-                  <Archive className="w-4 h-4" />
-                  {saving ? 'Salvando...' : 'Salvar Horários'}
-                </button>
-              </div>
-            )}
-          </CardBody>
-        </Card>
       </fieldset>
     </div>
   );

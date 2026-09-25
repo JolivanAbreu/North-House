@@ -22,6 +22,11 @@ const Categoria = sequelize.define('Categoria', {
 }, {
   tableName: 'categorias',
   timestamps: true,
+  // Sem isso o Sequelize "singulariza" Categoria como "Categorium": a API
+  // devolvia produto.Categorium (o frontend lê produto.Categoria) e criava a
+  // coluna fantasma CategoriumId. Resultado: todo produto aparecia sem
+  // categoria e caía no Cardápio, mesmo cadastrado na Mercearia.
+  name: { singular: 'Categoria', plural: 'Categorias' },
 });
 
 module.exports = Categoria;
