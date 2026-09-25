@@ -16,10 +16,15 @@ const ESTADO_INICIAL = { tipo: "Local", nome: "", mesaId: "", telefone: "", ende
 
 // Sem vitrine pública, os pedidos de delivery/retirada (telefone, WhatsApp)
 // também são lançados aqui pelo próprio atendente.
-const NovaComandaModal = ({ show, onClose, onConfirm, mesasLivres = [], mesaInicial = "", salvando }) => {
+// tipoInicial / tiposPermitidos: a tela de Delivery abre o modal já em
+// "Delivery" e sem a opção "No salão".
+const NovaComandaModal = ({
+  show, onClose, onConfirm, mesasLivres = [], mesaInicial = "", salvando,
+  tipoInicial = "Local", tiposPermitidos = null, titulo = "Nova comanda",
+}) => {
   // Já abre com a mesa escolhida no mapa de mesas (se houver). O componente
   // pai troca a "key" a cada abertura, então o formulário sempre começa limpo.
-  const [form, setForm] = useState(() => ({ ...ESTADO_INICIAL, mesaId: mesaInicial || "" }));
+  const [form, setForm] = useState(() => ({ ...ESTADO_INICIAL, tipo: tipoInicial, mesaId: mesaInicial || "" }));
   useTravarScroll(show);
 
   if (!show) return null;
@@ -60,7 +65,7 @@ const NovaComandaModal = ({ show, onClose, onConfirm, mesasLivres = [], mesaInic
             <span className="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center shrink-0">
               <ClipboardPlus className="w-5 h-5 text-brand-600" />
             </span>
-            <h2 className="text-xl font-bold font-display">Nova comanda</h2>
+            <h2 className="text-xl font-bold font-display">{titulo}</h2>
           </div>
           <button
             type="button"
@@ -72,8 +77,8 @@ const NovaComandaModal = ({ show, onClose, onConfirm, mesasLivres = [], mesaInic
         </div>
 
         {/* Tipo de atendimento */}
-        <div className="grid grid-cols-3 gap-2 mb-5">
-          {TIPOS.map(({ value, label, icon: Icon, ativo }) => (
+        <div className={`grid ${tiposPermitidos && tiposPermitidos.length === 2 ? "grid-cols-2" : "grid-cols-3"} gap-2 mb-5`}>
+          {TIPOS.filter((t) => !tiposPermitidos || tiposPermitidos.includes(t.value)).map(({ value, label, icon: Icon, ativo }) => (
             <button
               key={value}
               type="button"

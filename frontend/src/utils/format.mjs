@@ -43,6 +43,7 @@ export const STATUS_META = {
   'Recebido': { color: 'blue', label: 'Recebido' },
   'Em preparo': { color: 'amber', label: 'Em preparo' },
   'Pronto para entrega': { color: 'violet', label: 'Pronto p/ entrega' },
+  'Saiu para entrega': { color: 'violet', label: 'Saiu p/ entrega' },
   'Pronto para retirada': { color: 'violet', label: 'Pronto p/ retirada' },
   'Concluído': { color: 'emerald', label: 'Concluído' },
   'Cancelado': { color: 'rose', label: 'Cancelado' },

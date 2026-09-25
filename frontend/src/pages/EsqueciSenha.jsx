@@ -29,7 +29,7 @@ const EsqueciSenha = () => {
     <div className="flex items-center justify-center min-h-screen bg-stone-50 px-4">
       <div className="w-full max-w-sm animate-slideUp">
         <div className="flex flex-col items-center mb-8">
-          <Logo size="lg" className="mb-3" />
+          <Logo size="lg" className="mb-2" />
           <h2 className="text-2xl font-bold font-display text-stone-900">Redefinir senha</h2>
           <p className="text-stone-500 text-sm mt-1 text-center">
             Informe seu e-mail e enviaremos um link para criar uma nova senha.

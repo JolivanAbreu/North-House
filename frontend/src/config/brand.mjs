@@ -1,8 +1,9 @@
-// Identidade visual do Casa Nova, centralizada num lugar só.
-// Pra trocar o logo, basta substituir o arquivo frontend/public/logo.png
-// (PNG com fundo transparente, de preferência quadrado, 512x512).
+// Identidade visual da Casa do Norte, centralizada num lugar só.
+// logo.png = emblema (navbar, login, comprovante)
+// logo-completo.png = emblema + nome (cabeçalho do PDF dos relatórios)
 export const BRAND = {
-  nome: 'Casa Nova',
-  descricao: 'Restaurante & Mercearia',
+  nome: 'Casa do Norte',
+  descricao: 'Produtos Regionais',
   logo: '/logo.png',
+  logoCompleto: '/logo-completo.png',
 };

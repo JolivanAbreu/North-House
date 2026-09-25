@@ -42,7 +42,7 @@ const RedefinirSenha = () => {
     <div className="flex items-center justify-center min-h-screen bg-stone-50 px-4">
       <div className="w-full max-w-sm animate-slideUp">
         <div className="flex flex-col items-center mb-8">
-          <Logo size="lg" className="mb-3" />
+          <Logo size="lg" className="mb-2" />
           <h2 className="text-2xl font-bold font-display text-stone-900">Criar nova senha</h2>
         </div>
 

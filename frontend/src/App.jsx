@@ -14,6 +14,7 @@ import RedefinirSenha from './pages/RedefinirSenha.jsx';
 
 // Painel do restaurante
 import Comandas from './pages/admin/Comandas.jsx';
+import Delivery from './pages/admin/Delivery.jsx';
 import Dashboard from './pages/admin/Dashboard.jsx';
 import GerenciarCategorias from './pages/admin/GerenciarCategorias.jsx';
 import GerenciarProdutos from './pages/admin/GerenciarProdutos.jsx';
@@ -25,7 +26,7 @@ import Clientes from './pages/admin/Clientes.jsx';
 
 import NotFound from './pages/NotFound.jsx';
 
-// O sistema do Casa Nova é de uso interno do restaurante: não existe mais
+// O sistema da Casa do Norte é de uso interno do restaurante: não existe mais
 // vitrine pública, carrinho nem página de status de pedido para o cliente.
 function App() {
   return (
@@ -55,6 +56,7 @@ function App() {
           }
         >
           <Route index element={<Comandas />} />
+          <Route path="delivery" element={<Delivery />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="cardapio" element={<GerenciarProdutos tipoFixo="cardapio" />} />
           <Route path="mercearia" element={<GerenciarProdutos tipoFixo="mercearia" />} />

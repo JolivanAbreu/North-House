@@ -1,12 +1,12 @@
 {
-  "name": "Casa Nova - Comandas",
-  "short_name": "Casa Nova",
+  "name": "Casa do Norte - Comandas",
+  "short_name": "Casa do Norte",
   "start_url": "/admin",
   "display": "standalone",
   "background_color": "#fafaf9",
-  "theme_color": "#d15f27",
+  "theme_color": "#e0712a",
   "icons": [
-    { "src": "/logo.png", "sizes": "512x512", "type": "image/png" },
-    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+    { "src": "/logo-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/logo.png", "sizes": "448x448", "type": "image/png" }
   ]
 }

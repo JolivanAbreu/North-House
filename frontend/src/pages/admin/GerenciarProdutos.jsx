@@ -355,7 +355,7 @@ const GerenciarProdutos = ({ tipoFixo }) => {
     <div className="animate-fadeIn pb-12 w-full max-w-full">
       <PageHeader
         title={tipoFixo ? TITULOS[tipoFixo].titulo : "Produtos"}
-        subtitle={tipoFixo ? TITULOS[tipoFixo].subtitulo : "Cadastre e edite os produtos do Casa Nova"}
+        subtitle={tipoFixo ? TITULOS[tipoFixo].subtitulo : "Cadastre e edite os produtos da Casa do Norte"}
         action={
           <button
             onClick={handleAbrirNovoProduto}

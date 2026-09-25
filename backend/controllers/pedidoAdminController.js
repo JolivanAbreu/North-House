@@ -200,7 +200,7 @@
   const TIPOS_COMANDA = ['Local', 'Delivery', 'Retirada'];
 
   // Rota: POST /api/pedidos/admin
-  // Abre uma comanda direto pelo staff (o Casa Nova não tem vitrine pública).
+  // Abre uma comanda direto pelo staff (a Casa do Norte não tem vitrine pública).
   // - Local: cliente e mesa opcionais, sem telefone.
   // - Delivery / Retirada: pedidos recebidos por telefone/WhatsApp, com
   //   telefone do cliente (e endereço, no delivery).
@@ -240,7 +240,9 @@
         endereco_entrega: tipo_entrega === 'Delivery' ? String(endereco_entrega).trim() : null,
         tipo_entrega,
         forma_pagamento_ilustrativa: null,
-        status: 'Em preparo',
+        // Comanda do salão já nasce em preparo; delivery/retirada entram como
+        // "Recebido" no quadro da tela de Delivery.
+        status: ehLocal ? 'Em preparo' : 'Recebido',
         pago: false,
         subtotal: 0,
         valor_desconto: 0,
@@ -470,9 +472,14 @@
         }
       }
 
+      // Comanda local: pagar = encerrar. Delivery/retirada podem ser pagos
+      // antes (ex: Pix adiantado) e só são concluídos quando entregues/retirados.
+      const ETAPAS_FINAIS = ['Saiu para entrega', 'Pronto para entrega', 'Pronto para retirada', 'Concluído'];
+      const concluir = pedido.tipo_entrega === 'Local' || ETAPAS_FINAIS.includes(pedido.status);
+
       await pedido.update({
         pago: true,
-        status: 'Concluído',
+        status: concluir ? 'Concluído' : pedido.status,
         forma_pagamento_ilustrativa: forma_pagamento,
       }, { transaction: t });
 

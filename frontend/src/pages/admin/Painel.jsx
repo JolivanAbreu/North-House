@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
   Menu, X, LayoutDashboard, ClipboardList, Tags, Store, LogOut,
   FileBarChart, Users, UserCog, ShoppingBag, ChevronDown, UtensilsCrossed,
-  ShoppingBasket, MoreHorizontal,
+  ShoppingBasket, MoreHorizontal, Bike,
 } from "lucide-react";
 import useAuth from "../../hooks/useAuth.mjs";
 import Logo from "../../components/Logo.jsx";
@@ -12,6 +12,7 @@ import { BRAND } from "../../config/brand.mjs";
 // Abas principais do dia a dia do restaurante
 const NAV_ITEMS = [
   { to: "/admin", label: "Comandas", icon: ShoppingBag, end: true },
+  { to: "/admin/delivery", label: "Delivery", icon: Bike },
   { to: "/admin/cardapio", label: "Cardápio", icon: UtensilsCrossed },
   { to: "/admin/mercearia", label: "Mercearia", icon: ShoppingBasket },
   { to: "/admin/relatorios", label: "Relatórios", icon: FileBarChart },
@@ -88,7 +89,7 @@ const Painel = () => {
       isActive ? "bg-brand-50 text-brand-800" : "text-stone-600 hover:bg-stone-100"
     }`;
 
-  const initials = (usuario?.nome || usuario?.email || "CN").trim().charAt(0).toUpperCase();
+  const initials = (usuario?.nome || usuario?.email || "C").trim().charAt(0).toUpperCase();
   const isMaisRouteActive = NAV_ITEMS_MAIS.some((item) => location.pathname.startsWith(item.to));
 
   return (

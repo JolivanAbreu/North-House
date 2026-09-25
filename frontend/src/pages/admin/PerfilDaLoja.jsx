@@ -97,7 +97,7 @@ const PerfilDaLoja = () => {
         <Card>
           <CardBody className="pt-6">
             <form onSubmit={handleSubmit} className="space-y-5">
-              <Field label="Nome da loja" help="O nome exibido no sistema e no comprovante é Casa Nova.">
+              <Field label="Nome da loja" help="O nome exibido no sistema e no comprovante é Casa do Norte.">
                 <div className="relative">
                   <Store className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
@@ -105,7 +105,7 @@ const PerfilDaLoja = () => {
                     value={nomeLoja}
                     onChange={(e) => setNomeLoja(e.target.value)}
                     className={`${inputClasses} pl-10`}
-                    placeholder="Casa Nova"
+                    placeholder="Casa do Norte"
                   />
                 </div>
               </Field>
@@ -131,7 +131,7 @@ const PerfilDaLoja = () => {
                     value={instagram}
                     onChange={(e) => setInstagram(e.target.value)}
                     className={`${inputClasses} pl-10`}
-                    placeholder="https://www.instagram.com/casanova"
+                    placeholder="https://www.instagram.com/casadonorte"
                   />
                 </div>
               </Field>

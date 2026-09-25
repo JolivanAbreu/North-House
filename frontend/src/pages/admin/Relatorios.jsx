@@ -133,8 +133,8 @@ const Relatorios = () => {
     <div className="animate-fadeIn">
       {/* Cabeçalho com a marca da loja - só aparece na impressão/PDF */}
       <div className="hidden print:flex flex-col items-center mb-6 text-center border-b-2 border-brand-600 pb-4">
-        <Logo size="lg" className="mb-2" />
-        <h1 className="text-2xl font-bold font-display text-stone-900">{BRAND.nome}</h1>
+        <Logo size="xl" completo className="mb-2" />
+        <h1 className="sr-only">{BRAND.nome}</h1>
         <p className="text-sm text-stone-500">
           Relatório de vendas — período: {PERIODOS.find((p) => p.value === periodo)?.label} · emitido em {formatDateTime(new Date().toISOString())}
         </p>

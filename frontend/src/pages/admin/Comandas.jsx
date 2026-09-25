@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { createPortal } from "react-dom";
 import {
   Plus, Minus, ShoppingBag, Printer, Wallet, Trash2, X, Search, Clock,
-  Phone, MapPin, RotateCcw, CheckCheck, RefreshCw, ChevronUp, Maximize2
+  Phone, MapPin, RotateCcw, CheckCheck, RefreshCw,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "../../services/api.mjs";
@@ -28,8 +28,13 @@ const FILTROS_TIPO = [
   { value: "Retirada", label: "Retirada" },
 ];
 
+// Intervalo da atualização automática da tela (outros garçons/caixa
+// podem estar lançando itens em outro aparelho ao mesmo tempo).
 const INTERVALO_ATUALIZACAO_MS = 30000;
 
+// Comanda fica na tela enquanto não for paga/finalizada. As que acabaram
+// de ser pagas nesta sessão continuam visíveis até o "Concluir", pra dar
+// tempo de imprimir o comprovante.
 const ehComandaAtiva = (pedido, recemPagas) => {
   if (recemPagas.has(pedido.id)) return true;
   if (pedido.arquivado_em) return false;
@@ -51,7 +56,7 @@ const Comandas = () => {
   const [atualizando, setAtualizando] = useState(false);
   const [filtroTipo, setFiltroTipo] = useState("Todas");
   const [busca, setBusca] = useState("");
-  const [, setTick] = useState(0); 
+  const [, setTick] = useState(0); // re-render periódico p/ o "há X min"
 
   const [showNovaComanda, setShowNovaComanda] = useState(false);
   const [mesaPreSelecionada, setMesaPreSelecionada] = useState("");
@@ -64,13 +69,12 @@ const Comandas = () => {
   const [finalizando, setFinalizando] = useState(false);
   const [recemPagas, setRecemPagas] = useState(() => new Set());
 
-  // Estados de visualização da comanda
-  const [comandaAbertaId, setComandaAbertaId] = useState(null); // Modal dedicado
-  const [comandaExpandidaId, setComandaExpandidaId] = useState(null); // Inline expand
+  const [comandaAbertaId, setComandaAbertaId] = useState(null);
   const [itemAlterando, setItemAlterando] = useState(null);
 
   const buscaRef = useRef(null);
 
+  // Trava o scroll da página enquanto a comanda está aberta
   useTravarScroll(!!comandaAbertaId);
 
   const fetchTudo = useCallback(async ({ silencioso = false } = {}) => {
@@ -100,6 +104,7 @@ const Comandas = () => {
     fetchTudo();
   }, [fetchTudo]);
 
+  // Atualização automática + ao voltar para a aba do navegador
   useEffect(() => {
     const id = setInterval(() => {
       fetchTudo({ silencioso: true });
@@ -113,6 +118,7 @@ const Comandas = () => {
     };
   }, [fetchTudo]);
 
+  // Atalhos: "N" = nova comanda, "/" = buscar
   useEffect(() => {
     const handler = (e) => {
       const tag = e.target.tagName;
@@ -146,6 +152,7 @@ const Comandas = () => {
         (p.mesa_numero && `mesa ${p.mesa_numero}`.includes(termo)) ||
         String(p.mesa_numero || "") === termo,
       )
+      // Mais antigas primeiro: quem está esperando há mais tempo fica no topo
       .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
   }, [todasAtivas, filtroTipo, busca]);
 
@@ -171,9 +178,20 @@ const Comandas = () => {
     setPedidos((prev) => prev.map((p) => (p.id === atualizado.id ? { ...p, ...atualizado } : p)));
   };
 
+  // ---------- Ações ----------
+
   const abrirNovaComanda = (mesaId = "") => {
     setMesaPreSelecionada(mesaId ? String(mesaId) : "");
     setShowNovaComanda(true);
+  };
+
+  const handleClickMesa = (mesa) => {
+    if (mesa.status === "livre") {
+      abrirNovaComanda(mesa.id);
+      return;
+    }
+    const comandaDaMesa = todasAtivas.find((p) => p.MesaId === mesa.id && !p.pago);
+    if (comandaDaMesa) setComandaAbertaId(comandaDaMesa.id);
   };
 
   const handleAbrirComanda = async (dados) => {
@@ -283,7 +301,6 @@ const Comandas = () => {
       return novo;
     });
     if (comandaAbertaId === comandaId) setComandaAbertaId(null);
-    if (comandaExpandidaId === comandaId) setComandaExpandidaId(null);
     toast.success("Comanda enviada para o relatório do dia.");
   };
 
@@ -302,13 +319,15 @@ const Comandas = () => {
     }
   };
 
+  // ---------- Render ----------
+
   if (loading) {
     return (
       <div>
         <PageHeader title="Comandas" />
-        <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
           {Array.from({ length: 12 }).map((_, i) => (
-            <div key={i} className="h-24 bg-white rounded-2xl border border-stone-100 animate-pulse break-inside-avoid mb-3" />
+            <div key={i} className="h-24 bg-white rounded-2xl border border-stone-100 animate-pulse" />
           ))}
         </div>
       </div>
@@ -343,6 +362,7 @@ const Comandas = () => {
         }
       />
 
+      {/* Resumo do momento */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
         <ResumoTile label="Comandas locais" valor={resumo.locais} cor="text-violet-700" />
         <ResumoTile label="Delivery / retirada" valor={resumo.externas} cor="text-amber-700" />
@@ -350,6 +370,8 @@ const Comandas = () => {
         <ResumoTile label="Mesas ocupadas" valor={`${resumo.mesasOcupadas}/${mesas.length}`} cor="text-rose-700" />
       </div>
 
+
+      {/* Filtros + busca */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-5">
         <div className="flex gap-2 flex-wrap">
           {FILTROS_TIPO.map((f) => (
@@ -377,6 +399,7 @@ const Comandas = () => {
         </div>
       </div>
 
+      {/* Cards compactos */}
       {comandasVisiveis.length === 0 ? (
         <Card>
           <EmptyState
@@ -386,205 +409,37 @@ const Comandas = () => {
           />
         </Card>
       ) : (
-        <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
           {comandasVisiveis.map((comanda) => {
-            const expandida = comanda.id === comandaExpandidaId;
             const tipoMeta = getTipoEntregaMeta(comanda.tipo_entrega);
-            const origem = getOrigemComanda(comanda.PedidoItems);
             const ehLocal = comanda.tipo_entrega === "Local";
-            const itens = comanda.PedidoItems || [];
-            const podeEditar = !comanda.pago;
-
-            if (!expandida) {
-              return (
-                <div key={comanda.id} className="break-inside-avoid mb-3">
-                  <button
-                    type="button"
-                    onClick={() => setComandaExpandidaId(comanda.id)}
-                    className={`w-full text-left rounded-2xl border border-stone-200/60 p-4 shadow-sm hover:shadow-card hover:-translate-y-0.5 transition-all duration-200 flex flex-col gap-3 min-w-0 bg-white border-l-4 ${tipoMeta.borderClass.replace('border-l-4', '')}`}
-                  >
-                    <h3 className="font-bold text-[15px] text-stone-900 truncate w-full leading-tight">
-                      {nomeDaComanda(comanda)}
-                    </h3>
-                    <div className="flex items-center justify-between gap-2 w-full">
-                      <span className="text-xs text-stone-500 font-semibold truncate">
-                        {ehLocal ? (comanda.mesa_numero ? `Mesa ${comanda.mesa_numero}` : "Sem mesa") : tipoMeta.label}
-                      </span>
-                      {comanda.pago ? (
-                        <Badge color="emerald">Pago</Badge>
-                      ) : (
-                        <Badge color="rose">Aberto</Badge>
-                      )}
-                    </div>
-                  </button>
-                </div>
-              );
-            }
-
             return (
-              <div key={comanda.id} className="break-inside-avoid mb-3">
-                <div className={`w-full bg-white rounded-3xl border border-stone-200/60 shadow-xl overflow-hidden animate-fadeIn flex flex-col border-t-4 ${tipoMeta.borderClass.replace('border-l-4', '').replace('border-l-', 'border-t-')}`}>
-                  {/* Cabeçalho Inline */}
-                  <div
-                    onClick={() => setComandaExpandidaId(null)}
-                    className="w-full flex items-start justify-between gap-3 p-4 sm:p-5 bg-gradient-to-br from-white to-stone-50 border-b border-stone-100 cursor-pointer hover:bg-stone-50 transition-colors"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2.5 mb-1.5">
-                        <h2 className="text-xl font-bold font-display truncate text-stone-900 leading-none">
-                          {nomeDaComanda(comanda)}
-                        </h2>
-                        {comanda.mesa_numero && (
-                          <span className="shrink-0 px-2 py-0.5 bg-stone-900 text-white text-[11px] font-bold uppercase tracking-wider rounded-md shadow-sm">
-                            Mesa {comanda.mesa_numero}
-                          </span>
-                        )}
-                      </div>
-                      <p className="flex items-center gap-1.5 text-xs text-stone-500 font-medium truncate mt-2">
-                        <Clock className="w-3.5 h-3.5" /> Aberta em {formatDateTime(comanda.createdAt)} · {tempoDecorrido(comanda.createdAt)}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); setComandaAbertaId(comanda.id); setComandaExpandidaId(null); }}
-                        className="text-stone-400 hover:text-brand-600 p-1.5 bg-white hover:bg-brand-50 border border-stone-200 rounded-lg shadow-sm transition-all"
-                        title="Abrir em tela cheia"
-                      >
-                        <Maximize2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        className="text-stone-400 hover:text-stone-800 p-1.5 bg-white hover:bg-stone-100 border border-stone-200 rounded-lg shadow-sm transition-all"
-                        title="Minimizar"
-                      >
-                        <ChevronUp className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Corpo Inline */}
-                  <div className="p-4 sm:p-5 flex flex-col gap-4">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Badge color={tipoMeta.color}>{tipoMeta.label}</Badge>
-                      {origem && <Badge color={origem.color}>{origem.label}</Badge>}
-                      <Badge color={comanda.pago ? "emerald" : "rose"}>{comanda.pago ? "Pago" : "Aberto"}</Badge>
-                    </div>
-
-                    <div>
-                      <h3 className="font-bold text-stone-800 text-[11px] uppercase tracking-wider mb-2.5 flex items-center gap-2">
-                        Itens da Comanda <span className="h-px bg-stone-200 flex-1"></span>
-                      </h3>
-                      {(!itens || itens.length === 0) ? (
-                        <div className="py-4 text-center border border-dashed border-stone-200 rounded-xl bg-stone-50/50">
-                          <p className="text-sm text-stone-500">Nenhum item adicionado.</p>
-                        </div>
-                      ) : (
-                        <ul className="space-y-2 max-h-[180px] overflow-y-auto pr-1 custom-scrollbar">
-                          {itens.map((item) => {
-                            const totalItem = parseFloat(item.preco_unitario) * parseFloat(item.quantidade);
-                            const ocupado = itemAlterando === item.id;
-                            return (
-                              <li key={item.id} className={`flex items-center justify-between p-2.5 bg-stone-50/80 border border-stone-100 shadow-sm rounded-xl text-sm transition-colors hover:bg-stone-100 ${ocupado ? "opacity-50" : ""}`}>
-                                <div className="min-w-0 flex-1">
-                                  <p className="font-semibold text-stone-800 truncate">
-                                    {item.Produto?.nome || "Produto"}
-                                    {item.variacao_nome && <span className="text-stone-500 font-normal"> ({item.variacao_nome})</span>}
-                                  </p>
-                                  <p className="text-xs text-stone-400">
-                                    {formatQuantidade(item.quantidade)} × {formatCurrency(item.preco_unitario)}
-                                  </p>
-                                </div>
-                                {podeEditar && (
-                                  <div className="flex items-center gap-1 shrink-0 mx-2">
-                                    <button disabled={ocupado} onClick={() => handleAlterarQuantidade(comanda, item, -1)} className="w-6 h-6 flex items-center justify-center rounded-md bg-white border border-stone-200 text-stone-600 hover:bg-stone-100"><Minus className="w-3 h-3" /></button>
-                                    <button disabled={ocupado} onClick={() => handleAlterarQuantidade(comanda, item, 1)} className="w-6 h-6 flex items-center justify-center rounded-md bg-white border border-stone-200 text-stone-600 hover:bg-stone-100"><Plus className="w-3 h-3" /></button>
-                                  </div>
-                                )}
-                                <div className="flex items-center gap-3 shrink-0">
-                                  <span className="text-stone-800 font-bold tabular-nums">{formatCurrency(totalItem)}</span>
-                                  {podeEditar && (
-                                    <button disabled={ocupado} onClick={() => handleRemoverItem(comanda, item.id)} className="text-stone-300 hover:text-rose-600 bg-white p-1.5 rounded-lg border border-stone-200 shadow-sm transition-all hover:border-rose-200 hover:bg-rose-50">
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </button>
-                                  )}
-                                </div>
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      )}
-
-                      {podeEditar && (
-                        <button
-                          onClick={() => setComandaParaAdicionarItem(comanda)}
-                          className="w-full mt-3 flex items-center justify-center gap-1.5 text-sm font-semibold text-stone-600 bg-white hover:text-brand-600 hover:bg-brand-50 border border-dashed border-stone-300 hover:border-brand-300 transition-all px-3 py-2.5 rounded-xl shadow-sm"
-                        >
-                          <Plus className="w-4 h-4" /> Adicionar item
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Rodapé Inline */}
-                  <div className="bg-stone-50 p-4 sm:p-5 border-t border-stone-200/60 mt-auto">
-                    <div className="flex justify-between items-center text-sm text-stone-500 mb-1.5">
-                      <span className="font-medium">Subtotal</span>
-                      <span className="tabular-nums">{formatCurrency(comanda.subtotal)}</span>
-                    </div>
-                    {parseFloat(comanda.valor_desconto || 0) > 0 && (
-                      <div className="flex justify-between items-center text-sm text-emerald-600 mb-1.5">
-                        <span className="font-medium">Desconto</span>
-                        <span className="tabular-nums">- {formatCurrency(comanda.valor_desconto)}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between items-end mb-4">
-                      <span className="text-sm font-bold text-stone-800">Total</span>
-                      <span className="text-2xl font-black font-display text-stone-900 leading-none tabular-nums">{formatCurrency(comanda.valor_total)}</span>
-                    </div>
-
-                    {!comanda.pago ? (
-                      <button
-                        onClick={() => setComandaParaPagar(comanda)}
-                        disabled={!itens || itens.length === 0}
-                        className="w-full flex items-center justify-center gap-2 bg-emerald-600 text-white py-3 rounded-xl font-bold text-sm hover:bg-emerald-700 transition-all shadow-md hover:shadow-lg disabled:bg-stone-200 disabled:text-stone-400 disabled:shadow-none disabled:cursor-not-allowed"
-                      >
-                        <Wallet className="w-4 h-4" /> Pagar comanda
-                      </button>
-                    ) : (
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          onClick={() => imprimirComanda(comanda, perfil)}
-                          className="flex-1 flex items-center justify-center gap-2 bg-stone-800 text-white py-3 px-3 rounded-xl font-bold text-sm hover:bg-stone-900 transition-all shadow-md hover:shadow-lg"
-                        >
-                          <Printer className="w-4 h-4 shrink-0" /> <span className="truncate">Imprimir</span>
-                        </button>
-                        {ehLocal && (
-                          <button
-                            onClick={() => handleReabrir(comanda)}
-                            className="px-4 py-3 bg-white text-stone-700 border border-stone-200 rounded-xl text-sm font-bold hover:bg-stone-50 shadow-sm transition-all text-center"
-                            title="Reabrir comanda"
-                          >
-                            Reabrir
-                          </button>
-                        )}
-                        <button
-                          onClick={() => handleConcluir(comanda.id)}
-                          className="flex-1 px-4 py-3 bg-brand-50 text-brand-700 border border-brand-100 rounded-xl text-sm font-bold hover:bg-brand-100 shadow-sm transition-all text-center"
-                          title="Tirar da tela"
-                        >
-                          Concluir
-                        </button>
-                      </div>
-                    )}
-                  </div>
+              <button
+                key={comanda.id}
+                type="button"
+                onClick={() => setComandaAbertaId(comanda.id)}
+                className={`text-left rounded-2xl border p-4 shadow-sm hover:shadow-card hover:-translate-y-0.5 transition-all duration-200 flex flex-col gap-3 min-w-0 ${tipoMeta.cardClass}`}
+              >
+                <h3 className="font-bold text-[15px] text-stone-900 truncate w-full leading-tight">
+                  {nomeDaComanda(comanda)}
+                </h3>
+                <div className="flex items-center justify-between gap-2 w-full">
+                  <span className="text-xs text-stone-500 font-semibold truncate">
+                    {ehLocal ? (comanda.mesa_numero ? `Mesa ${comanda.mesa_numero}` : "Sem mesa") : tipoMeta.label}
+                  </span>
+                  {comanda.pago ? (
+                    <Badge color="emerald">Pago</Badge>
+                  ) : (
+                    <Badge color="rose">Aberto</Badge>
+                  )}
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>
       )}
 
+      {/* Comanda expandida (modal com fundo escurecido) */}
       {comandaAberta && createPortal(
         <ComandaDetalhe
           comanda={comandaAberta}
@@ -611,6 +466,7 @@ const Comandas = () => {
         salvando={abrindoComanda}
       />
 
+      {/* AdicionarItem e Pagamento abrem por cima da comanda (z-[9999]) */}
       <AdicionarItemModal
         show={!!comandaParaAdicionarItem}
         onClose={() => setComandaParaAdicionarItem(null)}
@@ -660,9 +516,10 @@ const ComandaDetalhe = ({
       onClick={onFechar}
     >
       <div
-        className={`bg-white rounded-3xl shadow-2xl w-full max-w-lg flex flex-col max-h-[92vh] animate-slideUp overflow-hidden border-t-8 ${tipoMeta.topoClass || tipoMeta.borderClass.replace('border-l-4', '').replace('border-l-', 'border-t-')}`}
+        className={`bg-white rounded-3xl shadow-2xl w-full max-w-lg flex flex-col max-h-[92vh] animate-slideUp overflow-hidden border-t-8 ${tipoMeta.topoClass}`}
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Cabeçalho */}
         <div className="flex items-start justify-between gap-3 p-5 sm:p-6 border-b border-stone-100 shrink-0">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2.5 mb-2">
@@ -704,6 +561,7 @@ const ComandaDetalhe = ({
           </button>
         </div>
 
+        {/* Itens */}
         <div className="p-5 sm:p-6 overflow-y-auto custom-scrollbar flex-1">
           <h3 className="font-bold text-stone-800 text-[11px] uppercase tracking-wider mb-3 flex items-center gap-2">
             Itens <span className="text-stone-400">({itens.length})</span> <span className="h-px bg-stone-200 flex-1" />
@@ -778,6 +636,7 @@ const ComandaDetalhe = ({
           )}
         </div>
 
+        {/* Footer: subtotal, total em destaque e ações */}
         <div className="bg-stone-50 p-5 sm:p-6 border-t border-stone-200/60 shrink-0">
           <div className="flex justify-between text-sm text-stone-500 mb-1.5">
             <span className="font-medium">Subtotal</span>
